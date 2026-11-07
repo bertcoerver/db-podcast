@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- First release installed from the add-on repository.
+
 ## Unreleased
 
 - First version as an add-on: syncs chosen feeds from fetchit's library in

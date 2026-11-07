@@ -4,7 +4,7 @@
 # as a ready-made image rather than built on the host. `version` is bumped by
 # the "Release add-on" workflow, after both images are pushed.
 name: db-podcast
-version: "0.1.0"
+version: "0.1.1"
 slug: db_podcast
 image: ghcr.io/bertcoerver/{arch}-db-podcast
 description: Publish feeds from fetchit's library as podcasts through Dropbox
