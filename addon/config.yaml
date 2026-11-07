@@ -1,0 +1,62 @@
+# Home Assistant add-on manifest.
+#
+# Installed from this repository (see repository.yaml at the root), and pulled
+# as a ready-made image rather than built on the host. `version` is bumped by
+# the "Release add-on" workflow, after both images are pushed.
+name: db-podcast
+version: "0.1.0"
+slug: db_podcast
+image: ghcr.io/bertcoerver/{arch}-db-podcast
+description: Publish feeds from fetchit's library as podcasts through Dropbox
+url: https://github.com/bertcoerver/db-podcast
+
+arch:
+  - aarch64
+  - amd64
+
+init: false
+startup: application
+
+# The GUI, as a panel in Home Assistant's sidebar: Home Assistant signs you in
+# and proxies the page, and no port is published on your network.
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:podcast
+panel_title: db-podcast
+
+map:
+  # -> /media in the container, read only: fetchit's library is /media/fetchit,
+  #    and db-podcast never writes to it.
+  - media:ro
+
+options:
+  app_key: ""
+  refresh_token: ""
+  feeds: []
+  remote_root: /podcasts
+  library: /media/fetchit
+  on_start: wait
+  schedule:
+    - "02:00"
+    - "07:00"
+    - "15:30"
+  log_level: info
+
+schema:
+  # The app key of your Dropbox app, and the token `db-podcast auth` wrote to
+  # .env on your own computer — see DOCS.md. There is no shell here to run
+  # the interactive `auth` in.
+  app_key: str
+  refresh_token: password
+  # The feeds to publish, by their name in fetchit.json. Empty publishes every
+  # audio and video feed in the library.
+  feeds:
+    - str
+  # The folder in Dropbox to mirror to; for an "App folder" app this is inside
+  # Apps/<app name>. Everything in it that is not published is deleted.
+  remote_root: str
+  library: str
+  on_start: list(wait|dry-run|run)
+  schedule:
+    - match(^([01][0-9]|2[0-3]):[0-5][0-9]$)
+  log_level: list(trace|debug|info|warning|error|fatal)

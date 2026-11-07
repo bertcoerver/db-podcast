@@ -1,0 +1,30 @@
+#!/usr/bin/with-contenv bashio
+#
+# Says what will be published, then hands over to `db-podcast serve`, which
+# keeps the schedule and serves the panel. Restarting the add-on picks up
+# changed options. The times are local, as Home Assistant's.
+
+set -e
+
+bashio::log.info "Checking the install..."
+(
+    # shellcheck source=../../../../usr/local/lib/db-podcast-env.sh
+    source /usr/local/lib/db-podcast-env.sh
+    echo "library: ${DB_PODCAST_LIBRARY}"; echo "feeds: ${DB_PODCAST_FEEDS:-(all)}"; echo "dropbox folder: ${DB_PODCAST_REMOTE_ROOT}"
+) | while IFS= read -r line; do
+    bashio::log.info "  ${line}"
+done || true
+
+# shellcheck source=../../../../usr/local/lib/db-podcast-env.sh
+source /usr/local/lib/db-podcast-env.sh
+
+if [ -z "${DB_PODCAST_SCHEDULE}" ]; then
+    bashio::log.warning "No times in 'schedule': db-podcast syncs only when asked, from the panel."
+else
+    bashio::log.info "Schedule: ${DB_PODCAST_SCHEDULE} (${TZ:-system timezone})"
+fi
+
+exec db-podcast serve \
+    --host 0.0.0.0 \
+    --port 8099 \
+    --on-start "$(bashio::config 'on_start')"

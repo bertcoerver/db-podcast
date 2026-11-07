@@ -1,0 +1,24 @@
+#!/usr/bin/with-contenv bashio
+#
+# One sync, with the environment it needs, for a person with a shell in the
+# container; the add-on itself syncs from `db-podcast serve`. `--dry-run` says
+# what would be uploaded and deleted, and changes nothing.
+
+set -e
+
+# shellcheck source=../lib/db-podcast-env.sh
+source /usr/local/lib/db-podcast-env.sh
+
+if [ -z "${DB_PODCAST_APP_KEY}" ] || [ -z "${DB_PODCAST_REFRESH_TOKEN}" ]; then
+    bashio::log.error "Set app_key and refresh_token first — see DOCS.md."
+    exit 1
+fi
+
+bashio::log.info "Syncing ${DB_PODCAST_FEEDS:-every feed} to Dropbox..."
+if db-podcast sync "$@"; then
+    bashio::log.info "Sync finished."
+else
+    rc=$?
+    bashio::log.error "Sync failed (exit ${rc})."
+    exit "${rc}"
+fi

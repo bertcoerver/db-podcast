@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "db-podcast"
+dynamic = ["version"]
+description = "Publish feeds from a fetchit library as podcasts through Dropbox."
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [
+    {name = "Bert Coerver", email = "b.coerver@mailbox.org"}
+]
+license = "MIT"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+# dropbox is the official SDK (uploads, shared links, token refresh); mutagen
+# reads the duration and title out of the audio files. Both are pure Python.
+dependencies = [
+    "dropbox>=12.0",
+    "mutagen>=1.47",
+]
+
+[project.scripts]
+db-podcast = "db_podcast.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-xdist>=3.0",
+    "ipython>=8.0",
+    "ipykernel>=6.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-n auto"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# The GUI `db-podcast serve` shows.
+[tool.setuptools.package-data]
+db_podcast = ["ui/*.html"]
+
+[tool.setuptools_scm]

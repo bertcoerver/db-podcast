@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>db-podcast</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1d2228; --muted: #66707b;
+    --line: #e2e5e9; --accent: #8a4bd6; --accent-text: #ffffff;
+    --ok: #1f8a4c; --bad: #c4362c; --warn: #a86a00; --code: #f0f2f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111418; --card: #1b1f24; --text: #e6e8eb; --muted: #9aa3ad;
+      --line: #2c323a; --accent: #b48af0; --accent-text: #0b0e12;
+      --ok: #4cc27f; --bad: #f07067; --warn: #e0a640; --code: #242a31;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin: 4px 0 16px; }
+  header h1 { font-size: 22px; margin: 0; }
+  header .meta { color: var(--muted); font-size: 13px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  section.wide { grid-column: 1 / -1; }
+  h2 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  h2 .spacer { flex: 1; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 14px; }
+  dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
+           border-radius: 7px; padding: 6px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.small { padding: 2px 8px; font-size: 13px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.off td { color: var(--muted); }
+  pre { background: var(--code); border-radius: 7px; padding: 10px; margin: 8px 0 0; font-size: 12.5px;
+        max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); } .muted { color: var(--muted); }
+  .pill { display: inline-block; font-size: 12px; padding: 0 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .url { display: flex; gap: 6px; align-items: center; }
+  .url input { flex: 1; min-width: 180px; font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text);
+               background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+  ul.activity { list-style: none; margin: 0; padding: 0; font-size: 14px; max-height: 300px; overflow: auto; }
+  ul.activity li { padding: 5px 0; border-bottom: 1px solid var(--line); display: flex; gap: 8px; }
+  ul.activity time { color: var(--muted); font-size: 12px; white-space: nowrap; padding-top: 2px; }
+  .hidden { display: none !important; }
+  code { background: var(--code); border-radius: 4px; padding: 0 4px; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>db-podcast</h1>
+    <span class="meta" id="meta">…</span>
+  </header>
+
+  <div class="grid">
+    <section>
+      <h2>Status</h2>
+      <dl id="status"></dl>
+    </section>
+
+    <section>
+      <h2>Sync</h2>
+      <div class="actions">
+        <button class="primary" data-job="sync">Sync now</button>
+        <button data-job="dry-run">Dry run</button>
+        <button data-job="check">Check the feeds</button>
+      </div>
+      <p class="muted" id="job-line" style="margin:10px 0 0">A sync uploads what is new, deletes what has gone, and publishes each feed. "Check" fetches the published feeds and their files the way a podcast app would.</p>
+      <pre id="job-output" class="hidden"></pre>
+    </section>
+
+    <section class="wide">
+      <h2>Podcasts <span class="spacer"></span><button class="small" id="refresh">Refresh</button></h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Podcast</th><th class="num">Episodes</th><th>Newest</th><th>Subscribe with</th></tr></thead>
+          <tbody id="podcasts"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <p class="muted" style="margin-bottom:0">Which feeds are published is the add-on's <code>feeds</code> option. A feed URL appears after the first sync, and stays the same for as long as the feed is published.</p>
+    </section>
+
+    <section class="wide">
+      <h2>Activity</h2>
+      <ul class="activity" id="activity"><li class="muted">Nothing since the add-on started.</li></ul>
+    </section>
+  </div>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const when = (iso) => iso ? new Date(iso).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : "—";
+const size = (b) => !b ? "—" : b > 1e9 ? (b / 1e9).toFixed(1) + " GB" : b > 1e6 ? Math.round(b / 1e6) + " MB" : Math.round(b / 1e3) + " kB";
+
+async function api(path, options = {}) {
+  const init = {...options, headers: {"Content-Type": "application/json"}};
+  if (init.body && typeof init.body !== "string") init.body = JSON.stringify(init.body);
+  const res = await fetch(path, init);
+  let data = {};
+  try { data = await res.json(); } catch (e) { /* not JSON */ }
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+let watching = null;
+
+async function loadStatus() {
+  let s;
+  try { s = await api("api/status"); } catch (e) { $("meta").textContent = "Cannot reach db-podcast: " + e.message; return; }
+  $("meta").textContent = `version ${s.version}`;
+  const rows = [
+    ["Dropbox", s.connected ? `<span class="ok">connected</span> · <code>${esc(s.remote_root)}</code>`
+                            : `<span class="bad">not set up</span> — set <code>app_key</code> and <code>refresh_token</code>`],
+    ["Library", esc(s.library) + (s.library_exists ? "" : ` <span class="bad">(missing)</span>`)],
+    ["Publishing", s.feeds ? esc(s.feeds.join(", ")) : "every podcast in the library"],
+    ["Schedule", s.schedule.length ? esc(s.schedule.join(", ")) : `<span class="muted">none — only when asked</span>`],
+    ["Next sync", s.running ? `<span class="warn">running now</span>` : esc(when(s.next_run))],
+  ];
+  $("status").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  if (s.running && !watching) watchJob(s.running.id);
+}
+
+async function loadPodcasts() {
+  try {
+    const {podcasts} = await api("api/podcasts");
+    if (!podcasts.length) { $("podcasts").innerHTML = `<tr><td colspan="4" class="muted">Nothing with audio or video in the library yet.</td></tr>`; return; }
+    $("podcasts").innerHTML = podcasts.map((p, i) => {
+      const name = `<b>${esc(p.title)}</b>` + (p.title !== p.name ? `<br><span class="muted">${esc(p.name)}</span>` : "")
+        + (p.kind ? ` <span class="pill">${esc(p.kind)}</span>` : "");
+      const url = !p.published ? `<span class="muted">not published</span>`
+        : p.url ? `<div class="url"><input readonly value="${esc(p.url)}" id="u${i}"><button class="small" data-copy="u${i}">Copy</button></div>`
+        : `<span class="muted">after the next sync</span>`;
+      return `<tr class="${p.published ? "" : "off"}"><td>${name}</td><td class="num">${p.episodes}<br><span class="muted">${size(p.bytes)}</span></td>
+        <td>${esc(p.newest || "—")}<br><span class="muted">${esc(p.newest_date || "")}</span></td><td>${url}</td></tr>`;
+    }).join("");
+    document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", async () => {
+      const input = $(b.dataset.copy);
+      try { await navigator.clipboard.writeText(input.value); } catch (e) { input.select(); document.execCommand("copy"); }
+      b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1500);
+    }));
+  } catch (e) {
+    $("podcasts").innerHTML = `<tr><td colspan="4" class="bad">${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function loadActivity() {
+  try {
+    const {activity} = await api("api/activity");
+    if (activity.length) $("activity").innerHTML = activity.map(a =>
+      `<li><time>${esc(when(a.when))}</time><span class="${a.ok ? "" : "bad"}">${esc(a.kind)}: ${esc(a.text)}</span></li>`).join("");
+  } catch (e) { /* keep what was there */ }
+}
+
+function setRunning(on) { document.querySelectorAll("[data-job]").forEach(b => b.disabled = on); }
+
+async function watchJob(id) {
+  if (watching === id) return;
+  watching = id; setRunning(true);
+  $("job-output").classList.remove("hidden");
+  for (;;) {
+    let job;
+    try { job = await api("api/jobs/" + id); } catch (e) { $("job-line").textContent = e.message; break; }
+    $("job-output").textContent = job.output || "…";
+    $("job-output").scrollTop = $("job-output").scrollHeight;
+    if (!job.running) {
+      $("job-line").innerHTML = `<span class="${job.ok ? "ok" : "bad"}">${esc(job.kind)}: ${esc(job.result)}</span>`;
+      break;
+    }
+    $("job-line").innerHTML = `<span class="warn">${esc(job.kind)} running since ${esc(when(job.started))}…</span>`;
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  watching = null; setRunning(false);
+  loadStatus(); loadPodcasts(); loadActivity();
+}
+
+document.querySelectorAll("[data-job]").forEach(b => b.addEventListener("click", async () => {
+  const kind = b.dataset.job;
+  try {
+    const job = kind === "check" ? await api("api/check", {method: "POST", body: {}})
+                                 : await api("api/sync", {method: "POST", body: {dry_run: kind === "dry-run"}});
+    watchJob(job.id);
+  } catch (e) { $("job-line").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+}));
+$("refresh").addEventListener("click", loadPodcasts);
+
+loadStatus(); loadPodcasts(); loadActivity();
+setInterval(() => { loadStatus(); loadActivity(); }, 10000);
+</script>
+</body>
+</html>
