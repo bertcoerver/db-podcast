@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Publish podcasts from the overview list, tabs only for published ones
+
 ## 0.2.1
 
 - Feeds that pass podcast validators
