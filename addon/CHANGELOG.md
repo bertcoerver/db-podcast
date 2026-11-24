@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- Sync as soon as fetchit says it downloaded something
+
 ## 0.3.1
 
 - Scale up podcast covers smaller than 1400 pixels
