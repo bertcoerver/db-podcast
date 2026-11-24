@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Scale up podcast covers smaller than 1400 pixels
+
 ## 0.3.0
 
 - Publish podcasts from the overview list, tabs only for published ones
