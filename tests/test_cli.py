@@ -32,7 +32,7 @@ def test_feed_on_the_command_line_wins(monkeypatch, tmp_path):
     monkeypatch.setenv("DB_PODCAST_SELECTION", str(tmp_path / "selection.json"))
     seen = {}
 
-    def fake_sync(library, remote, prune=True, dry_run=False, names=None, selection=None):
+    def fake_sync(library, remote, prune=True, dry_run=False, names=None, selection=None, owner_email=None):
         seen.update(library=library, names=names)
         return []
 

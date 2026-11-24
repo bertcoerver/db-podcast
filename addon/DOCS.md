@@ -33,6 +33,7 @@ like a password.
 | `app_key` | — | Your Dropbox app's key. |
 | `refresh_token` | — | From `db-podcast auth`. |
 | `feeds` | (all) | Read once, the first time the add-on finds the library: which podcasts start out published. Names from fetchit.json; empty is every audio and video feed. After that, the panel decides. |
+| `owner_email` | — | Optional. The address the feeds name as their owner (`itunes:email`), which Apple asks for. Anyone with a feed's URL can read it. |
 | `remote_root` | `/podcasts` | The folder in Dropbox to mirror to. Anything in it that is not published is deleted. |
 | `library` | `/media/fetchit` | fetchit's library. |
 | `on_start` | `wait` | `wait`, `dry-run` (say what would be uploaded and deleted) or `run`. |
@@ -63,6 +64,8 @@ library:
   Switching it only decides for episodes still to come.
 - **A tick per episode** says whether it is in the feed. Shift-click ticks a
   range.
+- **Category**: the Apple Podcasts category the feed names (Leisure unless you
+  choose another).
 
 Choices are saved as you click, in `/data/selection.json`, and Dropbox follows
 at the next sync (or **Sync now**). A podcast that appears in fetchit's library

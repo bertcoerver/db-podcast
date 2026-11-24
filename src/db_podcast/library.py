@@ -104,6 +104,8 @@ class Podcast:
     explicit: bool
     cover: Path | None
     episodes: list[Episode] = field(default_factory=list)
+    category: str | None = None
+    """Its Apple Podcasts category, if its record names one."""
 
     @property
     def files(self) -> list[Path]:
@@ -222,6 +224,7 @@ def _read_podcast(folder: Path, name: str) -> Podcast:
         explicit=bool(metadata.get("explicit", False)),
         cover=cover,
         episodes=episodes,
+        category=metadata.get("category") if isinstance(metadata.get("category"), str) else None,
     )
 
 

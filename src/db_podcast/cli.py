@@ -58,6 +58,7 @@ def _cmd_sync(args: argparse.Namespace, config: Config) -> int:
         dry_run=args.dry_run,
         names=args.feed,
         selection=_selection(config),
+        owner_email=config.owner_email,
     )
     if not published:
         logger.warning("No podcasts found in %s.", config.library)

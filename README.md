@@ -123,6 +123,7 @@ Environment variables, or lines in `.env` (see `.env.example`):
 | `DB_PODCAST_LIBRARY` | `~/fetchit` | also `--library` |
 | `DB_PODCAST_FEEDS` | all | comma-separated feed names: what is published until the first sync writes down the choices |
 | `DB_PODCAST_REMOTE_ROOT` | `/podcasts` | the folder in Dropbox to mirror to |
+| `DB_PODCAST_OWNER_EMAIL` | | optional: the feeds' owner address (`itunes:email`), which Apple asks for |
 | `DB_PODCAST_SELECTION` | `~/.config/db-podcast/selection.json` | what is chosen in the GUI's podcast tabs |
 
 ## Development

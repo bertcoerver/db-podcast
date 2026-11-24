@@ -14,6 +14,13 @@
 
 ## Unreleased
 
+- Feeds pass podcast validators: an iTunes owner and category, a plain RSS
+  image, `itunes:type` and `episodeType`, and `podcast:locked` / `podcast:guid`.
+  Choose the category in each podcast's tab; set `owner_email` to name an
+  owner address.
+- Artwork goes to Dropbox under the suffix of what it is: fetchit's cover.jpg
+  that is really a PNG is uploaded as cover.png, and served as one.
+
 - First version as an add-on: syncs chosen feeds from fetchit's library in
   /media/fetchit to Dropbox on a schedule.
 - A panel in Home Assistant's sidebar: every podcast, whether it is published,

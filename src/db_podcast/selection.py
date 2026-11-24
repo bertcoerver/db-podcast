@@ -33,6 +33,7 @@ import os
 from dataclasses import replace
 from pathlib import Path
 
+from db_podcast.feed import CATEGORIES, DEFAULT_CATEGORY
 from db_podcast.library import Episode, LibraryError, Podcast, aliases
 
 
@@ -123,6 +124,14 @@ class Selection:
         entry = self._entry(podcast)
         return entry["auto"] if isinstance(entry.get("auto"), bool) else True
 
+    def category(self, podcast: Podcast) -> str:
+        """Its Apple Podcasts category: chosen, from its record, or the default."""
+        chosen = self._entry(podcast).get("category")
+        for category in (chosen, podcast.category):
+            if category in CATEGORIES:
+                return category
+        return DEFAULT_CATEGORY
+
     def included(self, podcast: Podcast, episode: Episode) -> bool:
         episodes = self._entry(podcast).get("episodes")
         choice = episodes.get(episode_key(podcast, episode)) if isinstance(episodes, dict) else None
@@ -135,7 +144,11 @@ class Selection:
         it — for ``--feed``, which names the podcasts itself.
         """
         return [
-            replace(p, episodes=[e for e in p.episodes if self.included(p, e)])
+            replace(
+                p,
+                episodes=[e for e in p.episodes if self.included(p, e)],
+                category=self.category(p),
+            )
             for p in podcasts
             if everything or self.published(p)
         ]
@@ -149,6 +162,7 @@ class Selection:
         published: bool | None = None,
         auto: bool | None = None,
         episodes: dict[str, bool] | None = None,
+        category: str | None = None,
     ) -> None:
         """Change what is chosen for ``podcast``; what is not given stays.
 
@@ -168,6 +182,10 @@ class Selection:
             entry["published"] = self.published(podcast)
         if auto is not None:
             entry["auto"] = bool(auto)
+        if category is not None:
+            if category not in CATEGORIES:
+                raise ValueError(f"{category!r} is not one of Apple's categories.")
+            entry["category"] = category
         current.update({k: bool(v) for k, v in (episodes or {}).items() if k in current})
         entry["episodes"] = current
         self.podcasts[podcast.name] = entry

@@ -36,7 +36,7 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from db_podcast import __version__, library, sync
+from db_podcast import __version__, feed, library, sync
 from db_podcast.config import ConfigError, get_config
 from db_podcast.remote import DropboxRemote, RemoteError
 from db_podcast.selection import Selection, episode_key
@@ -273,6 +273,7 @@ class Service:
                 self.remote_factory(config),
                 dry_run=dry_run,
                 selection=self.selection(config, library.scan(config.library)),
+                owner_email=config.owner_email,
             )
             for item in published:
                 logger.info(
@@ -364,7 +365,9 @@ class Service:
 
     def choose(self, name: str, body: dict) -> dict | None:
         """Change what is published of podcast ``name``; see :meth:`Selection.set`."""
-        published, auto = body.get("published"), body.get("auto")
+        published, auto, category = body.get("published"), body.get("auto"), body.get("category")
+        if category is not None and category not in feed.CATEGORIES:
+            raise ValueError(f"{category!r} is not one of Apple's categories.")
         episodes = body.get("episodes")
         if published is not None and not isinstance(published, bool):
             raise ValueError("'published' should be true or false.")
@@ -382,7 +385,7 @@ class Service:
         self.selection(config, podcasts)
         with self._choices:
             choices = Selection.load(config.selection, config.feeds)
-            choices.set(found, published=published, auto=auto, episodes=episodes)
+            choices.set(found, published=published, auto=auto, episodes=episodes, category=category)
             choices.save()
         logger.info(
             "%s: %s, %d of %d episode(s) chosen; published at the next sync.",
@@ -408,6 +411,7 @@ class Service:
             "published": choices.published(podcast),
             "chosen": choices.chosen(podcast),
             "auto": choices.auto(podcast),
+            "category": choices.category(podcast),
             "url": self.urls.get(podcast.name),
         }
 
@@ -426,7 +430,11 @@ class Service:
                 "number": episode.number,
                 "included": choices.included(podcast, episode),
             })
-        return {"podcast": self._summary(config, choices, podcast), "episodes": episodes}
+        return {
+            "podcast": self._summary(config, choices, podcast),
+            "episodes": episodes,
+            "categories": list(feed.CATEGORIES),
+        }
 
 
 def _size(path: Path) -> int:

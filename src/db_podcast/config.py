@@ -15,6 +15,7 @@ LIBRARY_ENV = "DB_PODCAST_LIBRARY"
 REMOTE_ROOT_ENV = "DB_PODCAST_REMOTE_ROOT"
 FEEDS_ENV = "DB_PODCAST_FEEDS"
 SELECTION_ENV = "DB_PODCAST_SELECTION"
+OWNER_EMAIL_ENV = "DB_PODCAST_OWNER_EMAIL"
 
 DEFAULT_LIBRARY = "~/fetchit"
 DEFAULT_REMOTE_ROOT = "/podcasts"
@@ -42,6 +43,8 @@ class Config:
     in :attr:`selection`, wins."""
     selection: Path = Path(DEFAULT_SELECTION).expanduser()
     """The file with the choices made in the GUI (see :mod:`db_podcast.selection`)."""
+    owner_email: str | None = None
+    """The address the feeds name as their owner; Apple asks for one."""
 
     def credentials(self) -> tuple[str, str]:
         """Return the app key and refresh token, or say how to get them."""
@@ -63,6 +66,7 @@ def get_config(env_file: str | Path = ENV_FILE) -> Config:
         refresh_token=os.environ.get(REFRESH_TOKEN_ENV) or None,
         feeds=parse_feeds(os.environ.get(FEEDS_ENV)),
         selection=Path(os.environ.get(SELECTION_ENV) or DEFAULT_SELECTION).expanduser(),
+        owner_email=(os.environ.get(OWNER_EMAIL_ENV) or "").strip() or None,
     )
 
 

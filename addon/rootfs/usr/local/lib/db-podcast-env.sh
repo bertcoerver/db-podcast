@@ -12,10 +12,11 @@ DB_PODCAST_APP_KEY="$(bashio::config 'app_key')"
 DB_PODCAST_REFRESH_TOKEN="$(bashio::config 'refresh_token')"
 DB_PODCAST_LIBRARY="$(bashio::config 'library')"
 DB_PODCAST_REMOTE_ROOT="$(bashio::config 'remote_root')"
+DB_PODCAST_OWNER_EMAIL="$(jq -r '.owner_email // ""' /data/options.json)"
 # The list as db-podcast reads it: comma-separated, names and spaces and all.
 DB_PODCAST_FEEDS="$(jq -r '(.feeds // []) | join(",")' /data/options.json)"
 export DB_PODCAST_APP_KEY DB_PODCAST_REFRESH_TOKEN DB_PODCAST_LIBRARY \
-    DB_PODCAST_REMOTE_ROOT DB_PODCAST_FEEDS
+    DB_PODCAST_REMOTE_ROOT DB_PODCAST_FEEDS DB_PODCAST_OWNER_EMAIL
 
 # `db-podcast serve`: when to sync, where the subscribe URLs are kept between
 # restarts, and who may open the GUI — only Home Assistant's ingress proxy.

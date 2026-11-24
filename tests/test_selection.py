@@ -183,3 +183,15 @@ def test_sync_from_the_command_line_adopts_first(library, tmp_path, monkeypatch)
     _episode(gamma, "one", "2026-01-01T10:00:00+00:00")
     assert cli.main(["--library", str(library), "sync"]) == 0
     assert not any(name.startswith("gamma/") for name in remote.files)
+
+
+def test_a_category_is_chosen_from_apples_list(library, tmp_path):
+    from db_podcast.feed import DEFAULT_CATEGORY
+
+    alpha = scan(library)[0]
+    choices = Selection.load(tmp_path / "s.json")
+    assert choices.category(alpha) == DEFAULT_CATEGORY
+    choices.set(alpha, category="Kids & Family")
+    assert choices.choose([alpha])[0].category == "Kids & Family"
+    with pytest.raises(ValueError):
+        choices.set(alpha, category="Cats")

@@ -242,3 +242,45 @@ def test_sync_prunes_a_feed_that_is_no_longer_asked_for(fetchit_library):
     sync(fetchit_library, remote)
     sync(fetchit_library, remote, names=["Karambolage"])
     assert remote.deleted == ["Bureau Buitenland"]
+
+
+def test_the_feed_has_what_validators_ask_for(library):
+    """Owner, category, type, a plain RSS image, and the podcast namespace."""
+    (library / "show" / "cover.jpg").write_bytes(b"\xff\xd8\xff\xe0 a jpeg")
+    feeds = library.parent / "feeds"
+    (published,) = sync(library, FakeRemote(), feed_dir=feeds, owner_email="me@example.org")
+    channel = ET.parse(feeds / "show" / "feed.xml").getroot().find("channel")
+    itunes = "{http://www.itunes.com/dtds/podcast-1.0.dtd}"
+    pi = "{https://podcastindex.org/namespace/1.0}"
+
+    assert channel.find(itunes + "category").get("text") == "Leisure"
+    assert channel.findtext(f"{itunes}owner/{itunes}email") == "me@example.org"
+    assert channel.findtext(f"{itunes}owner/{itunes}name") == "show"
+    assert channel.findtext(itunes + "type") == "episodic"
+    assert channel.findtext("image/url") == channel.find(itunes + "image").get("href")
+    assert channel.findtext("image/title") == "show"
+    assert channel.find(pi + "locked").text == "yes"
+    assert channel.find(pi + "locked").get("owner") == "me@example.org"
+    # A UUIDv5 of the feed's URL, the same every time.
+    from db_podcast.feed import feed_guid
+    assert channel.findtext(pi + "guid") == str(feed_guid(published.feed_url))
+    assert [i.findtext(itunes + "episodeType") for i in channel.findall("item")] == ["full", "full"]
+
+
+def test_no_owner_email_unless_one_is_given(library):
+    feeds = library.parent / "feeds"
+    sync(library, FakeRemote(), feed_dir=feeds)
+    channel = ET.parse(feeds / "show" / "feed.xml").getroot().find("channel")
+    itunes = "{http://www.itunes.com/dtds/podcast-1.0.dtd}"
+    assert channel.find(f"{itunes}owner/{itunes}email") is None
+    assert channel.find("{https://podcastindex.org/namespace/1.0}locked").get("owner") is None
+
+
+def test_an_image_goes_up_under_the_suffix_of_what_it_is(library):
+    """fetchit calls a feed's artwork cover.jpg, PNG or not."""
+    (library / "show" / "cover.jpg").write_bytes(b"\x89PNG\r\n\x1a\n a png")
+    (library / "show" / "first.png").write_bytes(b"\xff\xd8\xff\xe0 really a jpeg")
+    remote = FakeRemote()
+    sync(library, remote)
+    assert {"show/cover.png", "show/first.jpg"} <= set(remote.files)
+    assert not {"show/cover.jpg", "show/first.png"} & set(remote.files)

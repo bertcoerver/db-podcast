@@ -34,6 +34,7 @@ options:
   refresh_token: ""
   feeds: []
   remote_root: /podcasts
+  owner_email: ""
   library: /media/fetchit
   on_start: wait
   schedule:
@@ -57,6 +58,9 @@ schema:
   # The folder in Dropbox to mirror to; for an "App folder" app this is inside
   # Apps/<app name>. Everything in it that is not published is deleted.
   remote_root: str
+  # The address the feeds name as their owner (itunes:email). Optional; Apple
+  # asks for one, and whoever has a feed's URL can read it.
+  owner_email: str?
   library: str
   on_start: list(wait|dry-run|run)
   schedule:

@@ -165,3 +165,13 @@ def test_a_podcast_new_in_the_library_waits_to_be_switched_on(running):
     assert {p["name"]: p["published"] for p in after["podcasts"]} == {
         "Brand New": False, "Bureau Buitenland": True, "Other": False,
     }
+
+
+def test_a_category_is_chosen_in_the_tab(running):
+    start, _, _ = running
+    base, _ = start()
+    _, detail = _call(base, "/api/podcast?name=Other")
+    assert detail["podcast"]["category"] == "Leisure" and "Kids & Family" in detail["categories"]
+    status, detail = _call(base, "/api/podcast", {"name": "Other", "category": "Kids & Family"})
+    assert status == 200 and detail["podcast"]["category"] == "Kids & Family"
+    assert _call(base, "/api/podcast", {"name": "Other", "category": "Cats"})[0] == 400

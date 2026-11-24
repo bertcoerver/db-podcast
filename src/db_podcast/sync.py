@@ -57,6 +57,7 @@ def sync(
     names: list[str] | None = None,
     feed_dir: str | Path | None = None,
     selection: Selection | None = None,
+    owner_email: str | None = None,
 ) -> list[Published]:
     """Bring ``remote`` in line with ``library`` and publish the feeds.
 
@@ -81,6 +82,8 @@ def sync(
     selection
         Which podcasts and episodes to publish. Every one, when not given.
         What is not chosen is pruned like what is gone from the library.
+    owner_email
+        The address each feed names as its owner, if any.
 
     Returns
     -------
@@ -89,7 +92,7 @@ def sync(
     """
     if feed_dir is None:
         with tempfile.TemporaryDirectory(prefix="db-podcast-") as work:
-            return sync(library, remote, prune, dry_run, names, work, selection)
+            return sync(library, remote, prune, dry_run, names, work, selection, owner_email)
     feed_dir = Path(feed_dir)
 
     in_library = scan(library, names)
@@ -115,10 +118,10 @@ def sync(
         if _key(feed_name) not in remote_files:
             # The feed names its own URL, and a file only gets a URL once it
             # is in Dropbox. So the very first time, it goes up without one.
-            _write(feed_path, feed.build(podcast, urls))
+            _write(feed_path, feed.build(podcast, urls, owner_email=owner_email))
             mirror.push(feed_path, feed_name)
         feed_url = remote.url(feed_name)
-        _write(feed_path, feed.build(podcast, urls, feed_url))
+        _write(feed_path, feed.build(podcast, urls, feed_url, owner_email))
         mirror.push(feed_path, feed_name)
         published.append(Published(podcast, feed_url))
 
@@ -131,9 +134,31 @@ def remote_name(podcast: Podcast, path: Path) -> str:
     """Where ``path`` goes in Dropbox: under the podcast's name, as it is filed.
 
     A series' episodes sit in season folders, and keep them; a flat folder's
-    files are just their names.
+    files are just their names. An image goes up under the suffix of what it
+    is, not what it is called: Dropbox serves a file by its name, and a PNG
+    called cover.jpg is sent as a JPEG.
     """
-    return f"{podcast.name}/{path.relative_to(podcast.folder).as_posix()}"
+    relative = path.relative_to(podcast.folder)
+    named = {".jpeg": ".jpg"}.get(path.suffix.lower(), path.suffix.lower())
+    if named in (".jpg", ".png"):
+        actual = _image_suffix(path)
+        if actual and actual != named:
+            relative = relative.with_suffix(actual)
+    return f"{podcast.name}/{relative.as_posix()}"
+
+
+def _image_suffix(path: Path) -> str | None:
+    """The suffix that fits what is in an image file, by its first bytes."""
+    try:
+        with path.open("rb") as file:
+            head = file.read(8)
+    except OSError:
+        return None
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    return None
 
 
 def check(published: list[Published]) -> bool:

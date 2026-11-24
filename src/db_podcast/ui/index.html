@@ -77,6 +77,7 @@
   label.switch { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
   label.switch b { display: block; font-weight: 600; }
   label.switch small { display: block; color: var(--muted); font-size: 13px; }
+  select { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px; }
   .savebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; margin-top: 12px; }
   .hidden { display: none !important; }
   code { background: var(--code); border-radius: 4px; padding: 0 4px; font-size: 13px; }
@@ -278,6 +279,8 @@ function renderPodcast() {
             ? "Every episode fetchit downloads from now on is ticked, and published at the sync after it arrives."
             : "Episodes fetchit downloads from now on wait here, unticked, until you tick them."}</small></span></label>
       </div>
+      <label class="switch" style="margin-top:12px;align-items:center"><span style="min-width:90px" class="muted">Category</span>
+        <select id="cat">${(shown.categories || []).map(c => `<option ${c === p.category ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></label>
       ${unpublishNote}
       ${p.published ? `<dl style="margin-top:14px"><dt>Subscribe with</dt><dd>${urlField(p, "u-open")}</dd></dl>` : ""}
     </section>
@@ -325,7 +328,7 @@ function flush() {
   if (!dirty || !shown) return saving;
   dirty = false;
   const {podcast: p, episodes} = shown;
-  const body = {name: p.name, published: p.published, auto: p.auto,
+  const body = {name: p.name, published: p.published, auto: p.auto, category: p.category,
                 episodes: Object.fromEntries(episodes.map(e => [e.key, e.included]))};
   saving = saving.then(async () => {
     try {
@@ -378,6 +381,10 @@ $("view-podcast").addEventListener("change", (ev) => {
     shown.podcast[ev.target.id === "pub" ? "published" : "auto"] = ev.target.checked;
     dirty = true;
     flush().then(() => { if (shown) renderPodcast(); });
+  } else if (ev.target.id === "cat") {
+    shown.podcast.category = ev.target.value;
+    dirty = true;
+    flush();
   }
 });
 
@@ -386,7 +393,7 @@ window.addEventListener("pagehide", () => {
   if (!dirty || !shown) return;
   const {podcast: p, episodes} = shown;
   fetch("api/podcast", {method: "POST", keepalive: true, headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name: p.name, published: p.published, auto: p.auto,
+    body: JSON.stringify({name: p.name, published: p.published, auto: p.auto, category: p.category,
                           episodes: Object.fromEntries(episodes.map(e => [e.key, e.included]))})});
 });
 
