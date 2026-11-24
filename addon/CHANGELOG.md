@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7
+
+- First release installed from the add-on repository.
+
 ## 0.1.1
 
 - First release installed from the add-on repository.
