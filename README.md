@@ -125,6 +125,7 @@ Environment variables, or lines in `.env` (see `.env.example`):
 | `DB_PODCAST_REMOTE_ROOT` | `/podcasts` | the folder in Dropbox to mirror to |
 | `DB_PODCAST_OWNER_EMAIL` | | optional: the feeds' owner address (`itunes:email`), which Apple asks for |
 | `DB_PODCAST_SELECTION` | `~/.config/db-podcast/selection.json` | what is chosen in the GUI's podcast tabs |
+| `DB_PODCAST_API_TOKEN` | | optional: lets other machines `POST /api/fetched` to `db-podcast serve` with `Authorization: Bearer <token>` |
 
 ## Development
 
@@ -146,6 +147,13 @@ episodes are ticked, and new episodes are added automatically or wait to be
 ticked. Those choices go to `DB_PODCAST_SELECTION`'s file, never the library,
 and `sync` follows them from the command line as well. Only this machine may open it, unless `DB_PODCAST_GUI_FROM`
 lists other addresses.
+
+It also takes **`POST /api/fetched`** with `{"feeds": ["Bureau Buitenland"]}` —
+what fetchit's `notify` sends after a run that downloaded something. A sync
+starts if one of the feeds is a published podcast (or one more is queued behind
+a job under way); no `feeds` at all always syncs. It answers `202`, to the GUI's
+addresses and to anyone presenting `DB_PODCAST_API_TOKEN` as a bearer token.
+See [the add-on's docs](addon/DOCS.md#syncing-as-soon-as-fetchit-downloads).
 
 ## Running it on Home Assistant
 

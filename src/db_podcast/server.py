@@ -13,10 +13,19 @@ The subscribe URLs are what a sync hands back; they are kept in
 :data:`URLS_ENV`'s file so the panel still shows them after a restart. Only one
 job runs at a time. The GUI answers only the addresses in :data:`GUI_FROM_ENV`:
 this machine by default, Home Assistant's ingress proxy in the add-on.
+
+One more endpoint is for fetchit rather than people: ``POST /api/fetched``
+with ``{"feeds": ["Bureau Buitenland", ...]}``, its word that it has just
+downloaded something for these feeds. If any of them is a podcast that is
+published, a sync starts — or, if a job is under way, one more follows it. It
+answers the GUI's addresses, and any client that presents
+:data:`API_TOKEN_ENV` as a bearer token: fetchit's address on Home Assistant's
+network changes, so it cannot be told apart by that.
 """
 
 from __future__ import annotations
 
+import hmac
 import ipaddress
 import json
 import logging
@@ -48,6 +57,7 @@ DEFAULT_PORT = 8099
 
 SCHEDULE_ENV = "DB_PODCAST_SCHEDULE"
 GUI_FROM_ENV = "DB_PODCAST_GUI_FROM"
+API_TOKEN_ENV = "DB_PODCAST_API_TOKEN"
 URLS_ENV = "DB_PODCAST_URLS"
 DEFAULT_FROM = "127.0.0.1,::1"
 DEFAULT_URLS = "~/.cache/db-podcast/feed-urls.json"
@@ -157,12 +167,14 @@ class Service:
         gui_from: str = DEFAULT_FROM,
         urls_file: str = DEFAULT_URLS,
         remote_factory=None,
+        api_token: str = "",
     ) -> None:
         self.library_override = library_override
         self.schedule = schedule or []
         self.gui_from = parse_networks(gui_from)
         self.urls_file = Path(os.path.expanduser(urls_file))
         self.remote_factory = remote_factory or _dropbox
+        self.api_token = api_token
         self.activity: deque[dict] = deque(maxlen=100)
         self.jobs: dict[str, Job] = {}
         self._order: deque[str] = deque()
@@ -170,6 +182,9 @@ class Service:
         self._lock = threading.Lock()
         self._choices = threading.Lock()
         self._stop = threading.Event()
+        # A sync asked for while a job runs, to follow it; see sync(again=...).
+        self._queue_lock = threading.Lock()
+        self._queued = False
         self._log = _JobLog()
         self.urls: dict[str, str] = self._load_urls()
 
@@ -227,9 +242,13 @@ class Service:
 
     def start_job(self, kind: str, work) -> Job:
         """Run ``work()`` on a thread, unless a job is going — then that job."""
+        return self._start_job(kind, work)[0]
+
+    def _start_job(self, kind: str, work) -> tuple[Job, bool]:
+        """:meth:`start_job`, saying as well whether the job is a new one."""
         with self._lock:
             if self._current is not None and self._current.finished is None:
-                return self._current
+                return self._current, False
             job = Job(id=uuid.uuid4().hex[:12], kind=kind)
             self._current = job
             self.jobs[job.id] = job
@@ -259,13 +278,20 @@ class Service:
                     logger.error("%s: %s", kind, job.result)
 
         threading.Thread(target=body, daemon=True, name=f"db-podcast-{kind}").start()
-        return job
+        return job, True
 
     def current(self) -> Job | None:
         job = self._current
         return job if job is not None and job.finished is None else None
 
-    def sync(self, *, dry_run: bool = False) -> Job:
+    def sync(self, *, dry_run: bool = False, again: bool = False) -> Job:
+        """Start a sync, or hand back the job under way.
+
+        ``again`` is for news that arrived after the job under way may already
+        have read the library: one more sync is queued behind it (only one,
+        however many such calls come in meanwhile). It is not for a dry run,
+        which publishes nothing.
+        """
         def work() -> str:
             config = self.config()
             published = sync.sync(
@@ -288,7 +314,56 @@ class Service:
             verb = "would be published" if dry_run else "published"
             return f"{len(published)} podcast(s) {verb}."
 
-        return self.start_job("dry-run" if dry_run else "sync", work)
+        if dry_run:
+            return self.start_job("dry-run", work)
+        with self._queue_lock:
+            job, new = self._start_job("sync", work)
+            if not new and again and not self._queued:
+                self._queued = True
+                threading.Thread(target=self._sync_after, args=(job,), daemon=True,
+                                 name="db-podcast-queued").start()
+            return job
+
+    def queued(self) -> bool:
+        """Whether a sync waits for the job under way to finish."""
+        return self._queued
+
+    def _sync_after(self, job: Job) -> None:
+        while job.finished is None and not self._stop.is_set():
+            self._stop.wait(1)
+        with self._queue_lock:
+            self._queued = False
+        if not self._stop.is_set():
+            # Should someone have started another job in the meantime, this
+            # queues behind that one in turn.
+            self.sync(again=True)
+
+    def fetched(self, feeds: list[str] | None) -> dict:
+        """fetchit downloaded something for ``feeds``: sync, if any is published.
+
+        The names are fetchit.json's, which are what a podcast's ``feed.json``
+        records as its ``name``; a podcast's folder, name in Dropbox and title
+        are accepted as well (see :func:`_known_as`), ignoring case and spaces
+        around them. No ``feeds`` at all means "something, somewhere", and
+        always syncs.
+        """
+        if feeds:
+            config = self.config()
+            podcasts = library.scan(config.library)
+            choices = self.selection(config, podcasts)
+            wanted = {str(f).strip().casefold() for f in feeds}
+            ours = sorted({p.name for p in podcasts if choices.published(p) and wanted & _known_as(p)})
+            if not ours:
+                return {"started": False, "reason": "None of these feeds is a podcast that is published."}
+        else:
+            ours = []
+        what = ", ".join(ours) if ours else "the library"
+        job = self.sync(again=True)
+        queued = self.queued()
+        text = f"fetchit downloaded new episodes for {what}" + ("; a sync follows the job under way." if queued else ".")
+        logger.info("%s", text)
+        self.activity.appendleft({"when": _iso(time.time()), "kind": "fetched", "text": text, "ok": True})
+        return {"started": True, "queued": queued, "podcasts": ours, "job": job.view()}
 
     def check(self) -> Job:
         def work() -> str:
@@ -437,6 +512,23 @@ class Service:
         }
 
 
+def _known_as(podcast: library.Podcast) -> set[str]:
+    """Every name fetchit might use for ``podcast``, folded for comparing.
+
+    fetchit names a feed by its ``name`` in fetchit.json, and writes that into
+    the folder's ``feed.json``; the folder itself is the same name made safe
+    for a file system, so the two can differ.
+    """
+    names = set(library.aliases(podcast))
+    try:
+        record = json.loads((podcast.folder / library.FETCHIT_FEED_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        record = None
+    if isinstance(record, dict) and isinstance(record.get("name"), str):
+        names.add(record["name"].strip().casefold())
+    return names
+
+
 def _size(path: Path) -> int:
     try:
         return path.stat().st_size
@@ -465,9 +557,23 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _allowed(self) -> bool:
+    def _allowed(self, *, token: bool = False) -> bool:
+        """Whether this client may be answered; if not, it is told so.
+
+        ``token``: a client elsewhere may also present the API token, as
+        ``Authorization: Bearer <token>``.
+        """
         if allowed(self.client_address[0], self.service.gui_from):
             return True
+        expected = self.service.api_token
+        if token and expected:
+            scheme, _, given = (self.headers.get("Authorization") or "").partition(" ")
+            if scheme.lower() == "bearer" and hmac.compare_digest(given.strip().encode(), expected.encode()):
+                return True
+            logger.warning("Refused %s from %s: no valid API token.", urlsplit(self.path).path,
+                           self.client_address[0])
+            self._json(HTTPStatus.FORBIDDEN, {"error": "This needs the API token."})
+            return False
         self._json(HTTPStatus.FORBIDDEN, {"error": "The GUI is not open to this address."})
         return False
 
@@ -520,11 +626,21 @@ class Handler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
     def do_POST(self) -> None:  # noqa: N802 - the stdlib's name
-        if not self._allowed():
-            return
         path = urlsplit(self.path).path.rstrip("/")
+        if not self._allowed(token=path == "/api/fetched"):
+            return
         body = self._body()
-        if path == "/api/sync":
+        if path == "/api/fetched":
+            feeds = body.get("feeds")
+            if isinstance(feeds, str):
+                feeds = [feeds]
+            if not isinstance(feeds, list):
+                feeds = None
+            try:
+                self._json(HTTPStatus.ACCEPTED, self.service.fetched(feeds or None))
+            except (ConfigError, library.LibraryError) as exc:
+                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        elif path == "/api/sync":
             self._json(HTTPStatus.ACCEPTED, self.service.sync(dry_run=bool(body.get("dry_run"))).view())
         elif path == "/api/check":
             self._json(HTTPStatus.ACCEPTED, self.service.check().view())
@@ -566,6 +682,7 @@ def serve(
         schedule=parse_schedule(os.environ.get(SCHEDULE_ENV, "")),
         gui_from=os.environ.get(GUI_FROM_ENV, "").strip() or DEFAULT_FROM,
         urls_file=os.environ.get(URLS_ENV, "").strip() or DEFAULT_URLS,
+        api_token=os.environ.get(API_TOKEN_ENV, "").strip(),
     )
     try:
         server = make_server(service, host, port)

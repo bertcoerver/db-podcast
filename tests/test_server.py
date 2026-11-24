@@ -48,9 +48,9 @@ def running(tmp_path, monkeypatch):
         service.stop()
 
 
-def _call(base, path, body=None):
+def _call(base, path, body=None, headers=None):
     data = json.dumps(body).encode() if body is not None else None
-    request = Request(base + path, data=data, headers={"Content-Type": "application/json"})
+    request = Request(base + path, data=data, headers={"Content-Type": "application/json", **(headers or {})})
     try:
         with urlopen(request, timeout=10) as response:
             return response.status, json.loads(response.read() or b"{}")
@@ -175,3 +175,90 @@ def test_a_category_is_chosen_in_the_tab(running):
     status, detail = _call(base, "/api/podcast", {"name": "Other", "category": "Kids & Family"})
     assert status == 200 and detail["podcast"]["category"] == "Kids & Family"
     assert _call(base, "/api/podcast", {"name": "Other", "category": "Cats"})[0] == 400
+
+
+def _until(condition, seconds=6.0):
+    """Wait for ``condition()``; a real wait, whatever is done to time.sleep."""
+    for _ in range(int(seconds / 0.02)):
+        if condition():
+            return True
+        threading.Event().wait(0.02)
+    return condition()
+
+
+def test_fetchit_news_syncs_only_for_published_podcasts(running, monkeypatch):
+    start, _, _ = running
+    syncs = []
+    gate = threading.Event()
+
+    def fake_sync(library, remote, **kwargs):
+        syncs.append(time.time())
+        gate.wait(5)
+        return []
+
+    monkeypatch.setattr(server.sync, "sync", fake_sync)
+    base, service = start()
+
+    # "Other" is in the library, but not published; nobody else's show is.
+    for feeds in (["Other"], ["Somebody Else's Show"]):
+        status, reply = _call(base, "/api/fetched", {"source": "fetchit", "fetched": 1, "feeds": feeds})
+        assert status == 202 and reply["started"] is False
+    assert not syncs
+
+    status, reply = _call(base, "/api/fetched", {"feeds": ["Other", " bureau buitenland "]})
+    assert status == 202 and reply["started"] is True and reply["queued"] is False
+    assert reply["podcasts"] == ["Bureau Buitenland"]
+    assert _until(lambda: len(syncs) == 1)
+
+    # News during a sync queues exactly one more, after it.
+    for _ in range(3):
+        reply = _call(base, "/api/fetched", {"feeds": ["Bureau Buitenland"]})[1]
+        assert reply["started"] is True and reply["queued"] is True
+    assert len(syncs) == 1
+    gate.set()
+    assert _until(lambda: len(syncs) == 2 and service.current() is None and not service.queued())
+    threading.Event().wait(1.5)
+    assert len(syncs) == 2
+    _, activity = _call(base, "/api/activity")
+    assert any(a["kind"] == "fetched" for a in activity["activity"])
+
+
+def test_fetchit_news_by_the_name_in_feed_json(running, monkeypatch):
+    start, _, tmp_path = running
+    monkeypatch.setattr(server.sync, "sync", lambda library, remote, **kwargs: [])
+    # fetchit makes a feed's name safe for a file system; feed.json keeps it as it is.
+    folder = tmp_path / "fetchit" / "podcasts" / "Bureau Buitenland"
+    (folder / "feed.json").write_text(json.dumps({"name": "Bureau: Buitenland", "title": "BB"}))
+    base, _ = start()
+    reply = _call(base, "/api/fetched", {"feeds": ["bureau: buitenland"]})[1]
+    assert reply["started"] is True and reply["podcasts"] == ["Bureau Buitenland"]
+
+
+def test_fetchit_news_without_feeds_always_syncs(running, monkeypatch):
+    start, _, _ = running
+    syncs = []
+    monkeypatch.setattr(server.sync, "sync", lambda library, remote, **kwargs: syncs.append(1) or [])
+    base, _ = start()
+    status, reply = _call(base, "/api/fetched", {"source": "fetchit"})
+    assert status == 202 and reply["started"] is True and reply["podcasts"] == []
+    assert _until(lambda: syncs)
+
+
+def test_fetchit_news_needs_the_api_token_from_elsewhere(running, monkeypatch):
+    start, _, _ = running
+    monkeypatch.setattr(server.sync, "sync", lambda library, remote, **kwargs: [])
+    base, _ = start(gui_from="10.9.9.9", api_token="s3cret")
+    assert _call(base, "/api/fetched", {"feeds": ["Other"]})[0] == 403
+    assert _call(base, "/api/fetched", {"feeds": ["Other"]}, headers={"Authorization": "Bearer nope"})[0] == 403
+    status, reply = _call(base, "/api/fetched", {"feeds": ["Other"]}, headers={"Authorization": "Bearer s3cret"})
+    assert status == 202 and reply["started"] is False
+    # The token opens only this: the GUI stays closed to that address.
+    assert _call(base, "/api/sync", {}, headers={"Authorization": "Bearer s3cret"})[0] == 403
+    assert _call(base, "/api/status", headers={"Authorization": "Bearer s3cret"})[0] == 403
+
+
+def test_without_a_token_fetchit_news_is_for_the_gui_addresses_only(running):
+    start, _, _ = running
+    base, _ = start(gui_from="10.9.9.9")
+    status, reply = _call(base, "/api/fetched", {}, headers={"Authorization": "Bearer "})
+    assert status == 403

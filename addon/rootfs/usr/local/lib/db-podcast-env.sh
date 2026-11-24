@@ -26,3 +26,7 @@ export DB_PODCAST_URLS="/data/feed-urls.json"
 # What the panel's podcast tabs switch on and tick; /media is read only.
 export DB_PODCAST_SELECTION="/data/selection.json"
 export DB_PODCAST_GUI_FROM="172.30.32.2"
+# fetchit's word that it downloaded something (/api/fetched) comes from an
+# address that changes, so it goes by this token instead.
+DB_PODCAST_API_TOKEN="$(jq -r '.api_token // ""' /data/options.json)"
+export DB_PODCAST_API_TOKEN

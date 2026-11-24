@@ -38,12 +38,43 @@ like a password.
 | `library` | `/media/fetchit` | fetchit's library. |
 | `on_start` | `wait` | `wait`, `dry-run` (say what would be uploaded and deleted) or `run`. |
 | `schedule` | `02:00`, `07:00`, `15:30` | Local times to sync at — a little after fetchit's runs. |
+| `api_token` | — | Optional. Lets fetchit start a sync as soon as it has downloaded something; see below. |
 | `log_level` | `info` | |
 
 Start it, open the panel, switch on the podcasts to publish in the list, choose
 their episodes in each one's tab, and press **Sync now**: each published podcast then shows the URL to subscribe to it
 with in a podcast app. The URLs stay the same for as long as
 the feeds are published.
+
+## Syncing as soon as fetchit downloads
+
+Rather than wait for the next time in `schedule`, db-podcast can sync the
+moment fetchit has downloaded a new episode. After any run that brought
+something, fetchit POSTs the names of the feeds that got it to each URL in its
+`notify` option:
+
+```json
+{"source": "fetchit", "fetched": 2, "feeds": ["Bureau Buitenland", "3Blue1Brown"]}
+```
+
+A sync starts if one of those feeds is a podcast that is published here — by
+its name in fetchit.json, ignoring case — and the rest are ignored. If a sync
+is already going, one more follows it, since the one under way may have read
+the library before the new episodes landed. To set it up:
+
+1. Here, set `api_token` to a long random string, and restart the add-on.
+2. In fetchit's options, add `http://<hostname>:8099/api/fetched` to `notify`.
+   `<hostname>` is on this add-on's **Info** page, something like
+   `a67c9053-db-podcast`.
+3. Put the same token in fetchit's `notify_token`, and restart fetchit.
+
+fetchit has only the one `notify_token` for every URL in `notify`, so if it
+tells rssignal as well, give rssignal's `api_token` and this one the same
+value. fetchit's address on Home Assistant's network changes, which is why
+this goes by a token rather than by address.
+
+The panel's activity says `fetched` when the news came in. A missed
+notification costs nothing: the schedule still syncs as before.
 
 ## The panel
 

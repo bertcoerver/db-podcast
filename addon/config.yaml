@@ -41,6 +41,7 @@ options:
     - "02:00"
     - "07:00"
     - "15:30"
+  api_token: ""
   log_level: info
 
 schema:
@@ -65,4 +66,8 @@ schema:
   on_start: list(wait|dry-run|run)
   schedule:
     - match(^([01][0-9]|2[0-3]):[0-5][0-9]$)
+  # What fetchit sends with its news (its `notify_token`), so a sync starts as
+  # soon as it has downloaded something — see DOCS.md. Empty: only the panel
+  # may ask, and the schedule does the rest.
+  api_token: password?
   log_level: list(trace|debug|info|warning|error|fatal)
