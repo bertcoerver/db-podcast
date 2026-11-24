@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Feeds that pass podcast validators
+
 ## 0.2.0
 
 - Choose podcasts and episodes in the panel, a tab per podcast
