@@ -22,6 +22,9 @@
 
 ## Unreleased
 
+- A podcast cover smaller than 1400 by 1400 pixels, the least Apple accepts,
+  is scaled up to that on its way to Dropbox. The library keeps the original.
+
 - Feeds pass podcast validators: an iTunes owner and category, a plain RSS
   image, `itunes:type` and `episodeType`, and `podcast:locked` / `podcast:guid`.
   Choose the category in each podcast's tab; set `owner_email` to name an

@@ -19,9 +19,12 @@ classifiers = [
 
 # dropbox is the official SDK (uploads, shared links, token refresh); mutagen
 # reads the duration and title out of the audio files. Both are pure Python.
+# Pillow scales up artwork that is too small for Apple; it has wheels for
+# every arch the add-on builds for.
 dependencies = [
     "dropbox>=12.0",
     "mutagen>=1.47",
+    "pillow>=10.0",
 ]
 
 [project.scripts]

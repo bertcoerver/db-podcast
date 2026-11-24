@@ -284,3 +284,66 @@ def test_an_image_goes_up_under_the_suffix_of_what_it_is(library):
     sync(library, remote)
     assert {"show/cover.png", "show/first.jpg"} <= set(remote.files)
     assert not {"show/cover.jpg", "show/first.png"} & set(remote.files)
+
+
+def _image(path, size, format):
+    from PIL import Image
+
+    Image.new("RGB", size, (200, 30, 30)).save(path, format=format)
+
+
+@pytest.mark.parametrize("format, suffix", [("JPEG", ".jpg"), ("PNG", ".png")])
+def test_small_cover_is_scaled_up_once(library, tmp_path, format, suffix):
+    """Apple wants 1400 pixels: a smaller cover goes up scaled, the library keeps its own."""
+    from PIL import Image
+
+    cover = library / "show" / f"cover{suffix}"
+    _image(cover, (516, 516), format)
+    original = cover.read_bytes()
+    remote = FakeRemote()
+    work = tmp_path / "work"
+
+    sync(library, remote, feed_dir=work)
+
+    name = f"show/cover{suffix}"
+    assert name in remote.files
+    scaled = work / "show" / f"cover{suffix}"
+    with Image.open(scaled) as image:
+        assert image.size == (1400, 1400)
+        assert image.format == format
+    assert remote.files[name] == content_hash(scaled)
+    assert cover.read_bytes() == original
+
+    remote.uploads.clear()
+    sync(library, remote, feed_dir=tmp_path / "other")
+    assert name not in remote.uploads
+
+
+def test_cover_keeps_its_shape(library, tmp_path):
+    _image(library / "show" / "cover.png", (600, 300), "PNG")
+    from PIL import Image
+
+    sync(library, FakeRemote(), feed_dir=tmp_path / "work")
+    with Image.open(tmp_path / "work" / "show" / "cover.png") as image:
+        assert image.size == (2800, 1400)
+
+
+def test_large_cover_goes_up_as_it_is(library, tmp_path):
+    cover = library / "show" / "cover.png"
+    _image(cover, (1400, 1400), "PNG")
+    remote = FakeRemote()
+
+    sync(library, remote, feed_dir=tmp_path / "work")
+
+    assert remote.files["show/cover.png"] == content_hash(cover)
+    assert not (tmp_path / "work" / "show" / "cover.png").exists()
+
+
+def test_unreadable_cover_goes_up_as_it_is(library, tmp_path):
+    cover = library / "show" / "cover.png"
+    cover.write_bytes(b"\x89PNG\r\n\x1a\n not really")
+    remote = FakeRemote()
+
+    sync(library, remote, feed_dir=tmp_path / "work")
+
+    assert remote.files["show/cover.png"] == content_hash(cover)

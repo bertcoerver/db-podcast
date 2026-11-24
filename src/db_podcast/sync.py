@@ -11,6 +11,7 @@ uploaded from there — the library may well be fetchit's, and has no place in
 it for a file of db-podcast's.
 """
 
+import io
 import logging
 import tempfile
 import unicodedata
@@ -22,6 +23,8 @@ from urllib.error import URLError
 from urllib.parse import unquote, urlsplit
 from urllib.request import Request, urlopen
 
+from PIL import Image
+
 from db_podcast import feed
 from db_podcast.library import FEED_FILE, Podcast, scan
 from db_podcast.remote import content_hash
@@ -30,6 +33,9 @@ from db_podcast.selection import Selection
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 30
+
+# Apple asks for artwork of at least 1400 by 1400 pixels.
+ARTWORK_MIN = 1400
 
 
 class Remote(Protocol):
@@ -105,7 +111,8 @@ def sync(
     for podcast in podcasts:
         names = {path: remote_name(podcast, path) for path in podcast.files}
         for path, name in names.items():
-            mirror.push(path, name)
+            source = artwork(path, feed_dir / podcast.name) if path == podcast.cover else path
+            mirror.push(source, name)
         feed_name = f"{podcast.name}/{FEED_FILE}"
         mirror.keep(feed_name)
         if dry_run:
@@ -145,6 +152,39 @@ def remote_name(podcast: Podcast, path: Path) -> str:
         if actual and actual != named:
             relative = relative.with_suffix(actual)
     return f"{podcast.name}/{relative.as_posix()}"
+
+
+def artwork(cover: Path, folder: Path) -> Path:
+    """The podcast's cover as it goes to Dropbox: at least :data:`ARTWORK_MIN`
+    pixels on its short side.
+
+    A smaller cover is scaled up into ``folder``, in the format it already
+    has; one that is big enough, or cannot be read as an image, goes up as it
+    is. The same cover always scales to the same bytes, so it is not uploaded
+    again on every run.
+    """
+    try:
+        with Image.open(cover) as image:
+            width, height = image.size
+            short = min(width, height)
+            if short >= ARTWORK_MIN or image.format not in ("JPEG", "PNG"):
+                return cover
+            scale = ARTWORK_MIN / short
+            size = (round(width * scale), round(height * scale))
+            scaled = image.resize(size, Image.Resampling.LANCZOS)
+            options = {"quality": 92} if image.format == "JPEG" else {}
+            if icc := image.info.get("icc_profile"):
+                options["icc_profile"] = icc
+            data = io.BytesIO()
+            scaled.save(data, format=image.format, **options)
+            suffix = ".jpg" if image.format == "JPEG" else ".png"
+    except (OSError, ValueError) as error:
+        logger.warning("Cannot scale up %s, uploading it as it is: %s", cover, error)
+        return cover
+    folder.mkdir(parents=True, exist_ok=True)
+    scaled_path = folder / f"cover{suffix}"
+    _write(scaled_path, data.getvalue())
+    return scaled_path
 
 
 def _image_suffix(path: Path) -> str | None:
