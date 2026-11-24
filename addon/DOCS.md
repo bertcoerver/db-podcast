@@ -32,7 +32,7 @@ like a password.
 |---|---|---|
 | `app_key` | — | Your Dropbox app's key. |
 | `refresh_token` | — | From `db-podcast auth`. |
-| `feeds` | (all) | Read once, the first time the add-on finds the library: which podcasts start out published. Names from fetchit.json; empty is every audio and video feed. After that, the panel decides. |
+| `feeds` | (none) | Read once, the first time the add-on finds the library: which podcasts start out published. Names from fetchit.json; empty is none of them. After that, the panel decides. |
 | `owner_email` | — | Optional. The address the feeds name as their owner (`itunes:email`), which Apple asks for. Anyone with a feed's URL can read it. |
 | `remote_root` | `/podcasts` | The folder in Dropbox to mirror to. Anything in it that is not published is deleted. |
 | `library` | `/media/fetchit` | fetchit's library. |
@@ -40,8 +40,8 @@ like a password.
 | `schedule` | `02:00`, `07:00`, `15:30` | Local times to sync at — a little after fetchit's runs. |
 | `log_level` | `info` | |
 
-Start it, open the panel, choose what to publish in each podcast's tab, and
-press **Sync now**: each published podcast then shows the URL to subscribe to it
+Start it, open the panel, switch on the podcasts to publish in the list, choose
+their episodes in each one's tab, and press **Sync now**: each published podcast then shows the URL to subscribe to it
 with in a podcast app. The URLs stay the same for as long as
 the feeds are published.
 
@@ -55,8 +55,9 @@ feeds the way a podcast app would, with what each printed. The URLs are kept in
 the add-on's `/data`, so they are there after a restart; a feed's URL stays the
 same for as long as it is published.
 
-Every podcast fetchit has filed has a tab of its own, with every episode in the
-library:
+Each podcast in the list has a **Publish** switch. A published podcast gets a
+tab of its own near the top, with every episode in the library (click a podcast
+that is not published to look at it before switching it on):
 
 - **Publish this podcast** switches the whole podcast on or off.
 - **Add new episodes automatically**: on, every episode fetchit downloads is

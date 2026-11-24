@@ -51,8 +51,8 @@ schema:
   refresh_token: password
   # Which podcasts are published, and which episodes, is chosen in the panel.
   # This only matters once, the first time the add-on finds the library: the
-  # feeds published from then on (names from fetchit.json; empty is every
-  # audio and video feed). New podcasts after that wait to be switched on.
+  # feeds published from then on (names from fetchit.json; empty is none of
+  # them). New podcasts after that wait to be switched on.
   feeds:
     - str
   # The folder in Dropbox to mirror to; for an "App folder" app this is inside

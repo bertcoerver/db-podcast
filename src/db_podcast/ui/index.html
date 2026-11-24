@@ -57,6 +57,9 @@
   th { color: var(--muted); font-weight: 500; white-space: nowrap; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   td.tick, th.tick { width: 28px; padding-right: 0; }
+  td.pub, th.pub { width: 1%; white-space: nowrap; }
+  td.pub label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  td.pub input:disabled { cursor: wait; }
   tr.off td { color: var(--muted); }
   tr.link { cursor: pointer; } tr.link:hover td { background: var(--accent-soft); }
   table.episodes tbody tr { cursor: pointer; }
@@ -117,11 +120,11 @@
       <h2>Podcasts <span class="spacer"></span><button class="small" id="refresh">Refresh</button></h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Podcast</th><th class="num">Episodes</th><th>Newest</th><th>Subscribe with</th></tr></thead>
-          <tbody id="podcasts"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
+          <thead><tr><th class="pub">Publish</th><th>Podcast</th><th class="num">Episodes</th><th>Newest</th><th>Subscribe with</th></tr></thead>
+          <tbody id="podcasts"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
         </table>
       </div>
-      <p class="muted" style="margin-bottom:0">Everything fetchit has filed under <code>podcasts/</code> and <code>shows/</code>. Open a podcast to switch it on or off and choose its episodes. A podcast new in the library starts switched off. A feed URL appears after the first sync, and stays the same for as long as the podcast is published.</p>
+      <p class="muted" style="margin-bottom:0">Everything fetchit has filed under <code>podcasts/</code> and <code>shows/</code>. Switch a podcast on to publish it; it then gets a tab above, where you choose its episodes. A podcast new in the library starts switched off; click it to look at its episodes first. A feed URL appears after the first sync, and stays the same for as long as the podcast is published.</p>
     </section>
 
     <section class="wide">
@@ -170,8 +173,10 @@ const tabHref = (name) => "#p=" + encodeURIComponent(name);
 
 function renderTabs() {
   const open = current();
+  // A tab for each published podcast, and for the one open now even if it is not.
+  const tabbed = podcasts.filter(p => p.published || p.name === open);
   $("tabs").innerHTML = `<a href="#" class="${open === null ? "on" : ""}"><span class="t">Overview</span></a>` +
-    podcasts.map(p => `<a href="${tabHref(p.name)}" class="${open === p.name ? "on" : ""}" title="${esc(p.title)}${p.kind ? " · " + esc(p.kind) : ""}">
+    tabbed.map(p => `<a href="${tabHref(p.name)}" class="${open === p.name ? "on" : ""}" title="${esc(p.title)}${p.kind ? " · " + esc(p.kind) : ""}">
       <span class="dot ${p.published ? "live" : ""}"></span><span class="t">${esc(p.title)}</span>${p.kind === "shows" ? ` <span class="pill">video</span>` : ""}</a>`).join("");
   const on = $("tabs").querySelector("a.on");
   if (on) on.scrollIntoView({block: "nearest", inline: "nearest"});
@@ -213,17 +218,23 @@ async function loadPodcasts() {
   try {
     ({podcasts} = await api("api/podcasts"));
   } catch (e) {
-    $("podcasts").innerHTML = `<tr><td colspan="4" class="bad">${esc(e.message)}</td></tr>`;
+    $("podcasts").innerHTML = `<tr><td colspan="5" class="bad">${esc(e.message)}</td></tr>`;
     return;
   }
   renderTabs();
-  if (!podcasts.length) { $("podcasts").innerHTML = `<tr><td colspan="4" class="muted">Nothing with audio or video in the library yet.</td></tr>`; return; }
+  renderPodcasts();
+}
+
+function renderPodcasts() {
+  if (!podcasts.length) { $("podcasts").innerHTML = `<tr><td colspan="5" class="muted">Nothing with audio or video in the library yet.</td></tr>`; return; }
   $("podcasts").innerHTML = podcasts.map((p, i) => {
     const name = `<b>${esc(p.title)}</b>` + (p.kind ? ` <span class="pill">${esc(p.kind)}</span>` : "")
       + (p.title !== p.name ? `<br><span class="muted">${esc(p.name)}</span>` : "");
     const count = p.published ? `${p.included} of ${p.episodes}<br><span class="muted">${size(p.bytes)}</span>`
                               : `<span class="muted">${p.episodes}</span>`;
-    return `<tr class="link ${p.published ? "" : "off"}" data-open="${esc(p.name)}"><td>${name}</td><td class="num">${count}</td>
+    const toggle = `<label title="${p.published ? "Published: click to stop publishing" : "Not published: click to publish"}">
+      <input type="checkbox" data-publish="${i}" ${p.published ? "checked" : ""} aria-label="Publish ${esc(p.title)}"></label>`;
+    return `<tr class="link ${p.published ? "" : "off"}" data-open="${esc(p.name)}"><td class="pub">${toggle}</td><td>${name}</td><td class="num">${count}</td>
       <td>${esc(p.newest || "—")}<br><span class="muted">${esc(day(p.newest_date))}</span></td><td>${urlField(p, "u" + i)}</td></tr>`;
   }).join("");
 }
@@ -341,7 +352,7 @@ function flush() {
           : `<span class="ok">Saved.</span> <span class="muted">Not published.</span>`;
       }
       const i = podcasts.findIndex(x => x.name === fresh.podcast.name);
-      if (i >= 0) { podcasts[i] = fresh.podcast; renderTabs(); }
+      if (i >= 0) { podcasts[i] = fresh.podcast; renderTabs(); renderPodcasts(); }
     } catch (e) {
       dirty = true;
       const el = $("saved");
@@ -446,6 +457,7 @@ document.addEventListener("click", async (ev) => {
     copy.textContent = "Copied"; setTimeout(() => copy.textContent = "Copy", 1500);
     return;
   }
+  if (ev.target.closest("td.pub")) return;  // the publish switch, handled on change
   const row = ev.target.closest("tr[data-open]");
   if (row && !ev.target.closest(".url")) location.hash = tabHref(row.dataset.open);
 });
@@ -456,6 +468,29 @@ $("job-toggle").addEventListener("click", () => {
   $("job-toggle").textContent = out.classList.contains("hidden") ? "Details" : "Hide";
 });
 $("refresh").addEventListener("click", loadPodcasts);
+
+// The publish switch in the list of podcasts.
+$("podcasts").addEventListener("change", async (ev) => {
+  const box = ev.target.closest("input[data-publish]");
+  if (!box) return;
+  const p = podcasts[Number(box.dataset.publish)];
+  if (!p) return;
+  const on = box.checked;
+  box.disabled = true;
+  if (shown && shown.podcast.name === p.name) await flush();
+  try {
+    const fresh = await api("api/podcast", {method: "POST", body: {name: p.name, published: on}});
+    const i = podcasts.findIndex(x => x.name === fresh.podcast.name);
+    if (i >= 0) podcasts[i] = fresh.podcast;
+    if (shown && shown.podcast.name === fresh.podcast.name) shown = fresh;
+  } catch (e) {
+    box.checked = !on;
+    $("jobbar").classList.remove("hidden");
+    $("job-line").innerHTML = `<span class="bad">${esc(p.title)} not saved: ${esc(e.message)}</span>`;
+  }
+  renderTabs();
+  renderPodcasts();
+});
 
 (async () => {
   await Promise.all([loadStatus(), loadPodcasts()]);

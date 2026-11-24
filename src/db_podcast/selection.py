@@ -20,8 +20,7 @@ fetchit has it; with it off, it waits to be ticked.
 
 A podcast with no entry is one that is new since the file was made, and is
 not published until it is switched on. Before there is a file at all, the
-podcasts follow ``DB_PODCAST_FEEDS`` (every podcast, when that is empty), as
-they did before there were choices; :meth:`Selection.adopt` writes that down
+podcasts follow ``DB_PODCAST_FEEDS`` (none of them, when that is empty); :meth:`Selection.adopt` writes that down
 the first time the library has podcasts in it, so nothing published so far
 is taken down by the switch.
 """
@@ -118,7 +117,8 @@ class Selection:
             return entry["published"]
         if self.exists:
             return False  # new since the choices were made: it waits to be switched on
-        return self.default_feeds is None or bool(self.default_feeds & aliases(podcast))
+        # Before any choices: only what DB_PODCAST_FEEDS names, nothing when it is empty.
+        return bool(self.default_feeds and self.default_feeds & aliases(podcast))
 
     def auto(self, podcast: Podcast) -> bool:
         entry = self._entry(podcast)

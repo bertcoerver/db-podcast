@@ -52,8 +52,8 @@ export DB_PODCAST_FEEDS="Bureau Buitenland, Mes premières Belles Histoires"
 ```
 
 A podcast is any feed in `podcasts/` (audio) or `shows/` (video — podcast apps play
-video too) that has something to play. Leave `DB_PODCAST_FEEDS` empty to publish
-all of them. Names are the feeds' names in fetchit.json, or their titles, ignoring
+video too) that has something to play. With `DB_PODCAST_FEEDS` empty, none of
+them is published until you switch it on. Names are the feeds' names in fetchit.json, or their titles, ignoring
 case. That is only where it starts: the first sync writes down what is published
 in `DB_PODCAST_SELECTION`'s file, and from then on that file decides — edited in
 the GUI of `db-podcast serve` — and a podcast that is new in the library waits
@@ -121,7 +121,7 @@ Environment variables, or lines in `.env` (see `.env.example`):
 | `DB_PODCAST_APP_KEY` | | written by `db-podcast auth` |
 | `DB_PODCAST_REFRESH_TOKEN` | | written by `db-podcast auth` |
 | `DB_PODCAST_LIBRARY` | `~/fetchit` | also `--library` |
-| `DB_PODCAST_FEEDS` | all | comma-separated feed names: what is published until the first sync writes down the choices |
+| `DB_PODCAST_FEEDS` | none | comma-separated feed names: what is published until the first sync writes down the choices |
 | `DB_PODCAST_REMOTE_ROOT` | `/podcasts` | the folder in Dropbox to mirror to |
 | `DB_PODCAST_OWNER_EMAIL` | | optional: the feeds' owner address (`itunes:email`), which Apple asks for |
 | `DB_PODCAST_SELECTION` | `~/.config/db-podcast/selection.json` | what is chosen in the GUI's podcast tabs |

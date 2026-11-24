@@ -32,12 +32,13 @@ def _by_name(podcasts):
     return {p.name: [e.audio.name for e in p.episodes] for p in podcasts}
 
 
-def test_nothing_chosen_publishes_everything(library, tmp_path):
+def test_nothing_chosen_publishes_nothing(library, tmp_path):
     choices = Selection.load(tmp_path / "none.json")
-    assert _by_name(choices.choose(scan(library))) == {
-        "alpha": ["two.mp3", "one.mp3"],
-        "beta": ["two.mp3", "one.mp3"],
-    }
+    assert choices.choose(scan(library)) == []
+
+    alpha = scan(library)[0]
+    choices.set(alpha, published=True)
+    assert _by_name(choices.choose(scan(library))) == {"alpha": ["two.mp3", "one.mp3"]}
 
 
 def test_the_feeds_option_is_the_default_for_podcasts_not_chosen_for(library, tmp_path):
@@ -53,7 +54,7 @@ def test_choices_are_saved_and_read_back(library, tmp_path):
     path = tmp_path / "conf" / "selection.json"
     alpha, beta = scan(library)
     choices = Selection.load(path)
-    choices.set(alpha, episodes={"one.mp3": False})
+    choices.set(alpha, published=True, episodes={"one.mp3": False})
     choices.set(beta, published=False)
     choices.save()
 
@@ -65,6 +66,7 @@ def test_choices_are_saved_and_read_back(library, tmp_path):
 def test_auto_decides_only_for_episodes_that_arrive_later(library, tmp_path):
     alpha = scan(library)[0]
     choices = Selection.load(tmp_path / "s.json")
+    choices.set(alpha, published=True)
     # Switching it off keeps what is published now...
     choices.set(alpha, auto=False)
     assert _by_name(choices.choose([alpha])) == {"alpha": ["two.mp3", "one.mp3"]}
@@ -108,11 +110,11 @@ def test_a_broken_file_is_an_error_not_an_empty_choice(tmp_path):
 def test_sync_takes_out_what_is_unticked_and_switched_off(library, tmp_path):
     remote = FakeRemote()
     path = tmp_path / "s.json"
-    sync(library, remote, selection=Selection.load(path))
+    sync(library, remote, selection=Selection.load(path, default_feeds=["alpha", "beta"]))
     assert {"alpha/one.mp3", "beta/one.mp3", "beta/feed.xml"} <= set(remote.files)
 
     alpha, beta = scan(library)
-    choices = Selection.load(path)
+    choices = Selection.load(path, default_feeds=["alpha", "beta"])
     choices.set(alpha, episodes={"one.mp3": False})
     choices.set(beta, published=False)
     choices.save()
@@ -127,7 +129,8 @@ def test_switching_everything_off_empties_dropbox(library, tmp_path):
     """Unlike a library that is missing, which leaves Dropbox alone."""
     remote = FakeRemote()
     path = tmp_path / "s.json"
-    sync(library, remote, selection=Selection.load(path))
+    sync(library, remote, selection=Selection.load(path, default_feeds=["alpha", "beta"]))
+    assert remote.files
     choices = Selection.load(path)
     for podcast in scan(library):
         choices.set(podcast, published=False)
@@ -172,7 +175,7 @@ def test_sync_from_the_command_line_adopts_first(library, tmp_path, monkeypatch)
     from db_podcast import cli
 
     monkeypatch.setenv("DB_PODCAST_SELECTION", str(tmp_path / "s.json"))
-    monkeypatch.delenv("DB_PODCAST_FEEDS", raising=False)
+    monkeypatch.setenv("DB_PODCAST_FEEDS", "alpha, beta")
     remote = FakeRemote()
     monkeypatch.setattr(cli, "_remote", lambda config: remote)
     assert cli.main(["--library", str(library), "sync"]) == 0
@@ -191,7 +194,7 @@ def test_a_category_is_chosen_from_apples_list(library, tmp_path):
     alpha = scan(library)[0]
     choices = Selection.load(tmp_path / "s.json")
     assert choices.category(alpha) == DEFAULT_CATEGORY
-    choices.set(alpha, category="Kids & Family")
+    choices.set(alpha, published=True, category="Kids & Family")
     assert choices.choose([alpha])[0].category == "Kids & Family"
     with pytest.raises(ValueError):
         choices.set(alpha, category="Cats")
