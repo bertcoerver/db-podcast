@@ -28,6 +28,7 @@ def running(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_PODCAST_FEEDS", "Bureau Buitenland")
     monkeypatch.setenv("DB_PODCAST_APP_KEY", "key")
     monkeypatch.setenv("DB_PODCAST_REFRESH_TOKEN", "token")
+    monkeypatch.setenv("DB_PODCAST_SELECTION", str(tmp_path / "selection.json"))
     monkeypatch.chdir(tmp_path)  # no stray .env
     remote = FakeRemote()
     started = []
@@ -115,3 +116,52 @@ def test_the_gui_is_only_for_its_own_addresses(running):
     start, _, _ = running
     base, _ = start(gui_from="10.9.9.9")
     assert _call(base, "/api/status")[0] == 403
+
+
+def test_a_podcast_tab_shows_its_episodes_and_saves_what_is_ticked(running):
+    start, remote, tmp_path = running
+    base, _ = start()
+
+    status, detail = _call(base, "/api/podcast?name=Other")
+    assert status == 200
+    assert detail["podcast"]["published"] is False  # not in DB_PODCAST_FEEDS
+    assert [(e["key"], e["included"]) for e in detail["episodes"]] == [("2026-11-06 - Ep.mp3", True)]
+
+    status, detail = _call(base, "/api/podcast", {"name": "Other", "published": True, "auto": False,
+                                                  "episodes": {"2026-11-06 - Ep.mp3": False}})
+    assert status == 200
+    assert detail["podcast"]["published"] and not detail["podcast"]["auto"]
+    assert detail["podcast"]["included"] == 0
+    saved = json.loads((tmp_path / "selection.json").read_text())
+    assert saved["podcasts"]["Other"] == {
+        "published": True, "auto": False, "episodes": {"2026-11-06 - Ep.mp3": False},
+    }
+
+    job = _wait(base, _call(base, "/api/sync", {})[1])
+    assert job["ok"] and job["result"] == "2 podcast(s) published."
+    # Published, with a feed to subscribe to, but without the unticked episode.
+    assert "other/feed.xml" in {name.lower() for name in remote.files}
+    assert not any(name.lower().startswith("other/2026") for name in remote.files)
+
+
+def test_choosing_for_a_podcast_that_is_not_there_is_refused(running):
+    start, _, _ = running
+    base, _ = start()
+    assert _call(base, "/api/podcast?name=Nope")[0] == 404
+    assert _call(base, "/api/podcast", {"name": "Nope", "published": True})[0] == 404
+    assert _call(base, "/api/podcast", {"name": "Other", "published": "yes"})[0] == 400
+
+
+def test_a_podcast_new_in_the_library_waits_to_be_switched_on(running):
+    start, _, tmp_path = running
+    base, _ = start()
+    _, before = _call(base, "/api/podcasts")
+    assert [p["published"] for p in before["podcasts"]] == [True, False]
+
+    folder = tmp_path / "fetchit" / "podcasts" / "Brand New"
+    folder.mkdir()
+    (folder / "ep.mp3").write_bytes(b"ep")
+    _, after = _call(base, "/api/podcasts")
+    assert {p["name"]: p["published"] for p in after["podcasts"]} == {
+        "Brand New": False, "Bureau Buitenland": True, "Other": False,
+    }

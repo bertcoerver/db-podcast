@@ -4,7 +4,10 @@ One long-lived process instead of a scheduler loop in a shell script: it syncs
 at the times in :data:`SCHEDULE_ENV`, and serves a page — the Home Assistant
 add-on's sidebar panel, through ingress — listing every podcast in the
 library, whether it is published, and the URL to subscribe to it with, with
-buttons to sync, dry-run or check now.
+buttons to sync, dry-run or check now. Each podcast has a tab of its own, where
+it is switched on or off and its episodes are ticked; those choices are kept
+in a file of db-podcast's (see :mod:`db_podcast.selection`), and the next sync
+publishes them.
 
 The subscribe URLs are what a sync hands back; they are kept in
 :data:`URLS_ENV`'s file so the panel still shows them after a restart. Only one
@@ -31,11 +34,12 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from db_podcast import __version__, library, sync
 from db_podcast.config import ConfigError, get_config
 from db_podcast.remote import DropboxRemote, RemoteError
+from db_podcast.selection import Selection, episode_key
 
 logger = logging.getLogger("db_podcast")
 
@@ -164,6 +168,7 @@ class Service:
         self._order: deque[str] = deque()
         self._current: Job | None = None
         self._lock = threading.Lock()
+        self._choices = threading.Lock()
         self._stop = threading.Event()
         self._log = _JobLog()
         self.urls: dict[str, str] = self._load_urls()
@@ -175,6 +180,15 @@ class Service:
 
             config = replace(config, library=self.library_override)
         return config
+
+    def selection(self, config, podcasts: list[library.Podcast] | None = None) -> Selection:
+        """The choices, adopting what is published now if none were made yet."""
+        with self._choices:
+            choices = Selection.load(config.selection, config.feeds)
+            if podcasts is not None and choices.adopt(podcasts):
+                logger.info("Wrote down what is published now in %s; new podcasts wait "
+                            "to be switched on.", config.selection)
+            return choices
 
     # life cycle
 
@@ -254,7 +268,12 @@ class Service:
     def sync(self, *, dry_run: bool = False) -> Job:
         def work() -> str:
             config = self.config()
-            published = sync.sync(config.library, self.remote_factory(config), dry_run=dry_run, names=config.feeds)
+            published = sync.sync(
+                config.library,
+                self.remote_factory(config),
+                dry_run=dry_run,
+                selection=self.selection(config, library.scan(config.library)),
+            )
             for item in published:
                 logger.info(
                     "%s: %d episode(s)  %s",
@@ -276,7 +295,8 @@ class Service:
             remote = self.remote_factory(config)
             in_dropbox = {name.lower() for name in remote.list()}
             published = []
-            for podcast in library.scan(config.library, config.feeds):
+            podcasts = library.scan(config.library)
+            for podcast in self.selection(config, podcasts).choose(podcasts):
                 feed_name = f"{podcast.name}/{library.FEED_FILE}"
                 if feed_name.lower() in in_dropbox:
                     published.append(sync.Published(podcast, remote.url(feed_name)))
@@ -319,6 +339,7 @@ class Service:
             "library": str(config.library),
             "library_exists": config.library.is_dir(),
             "feeds": config.feeds,
+            "selection": str(config.selection),
             "remote_root": config.remote_root,
             "connected": bool(config.app_key and config.refresh_token),
             "schedule": [f"{h:02d}:{m:02d}" for h, m in self.schedule],
@@ -329,29 +350,90 @@ class Service:
     def podcasts(self) -> list[dict]:
         config = self.config()
         podcasts = library.scan(config.library)
-        wanted = {n.strip().casefold() for n in config.feeds} if config.feeds else None
-        out = []
-        for podcast in podcasts:
-            names = {podcast.folder.name.casefold(), podcast.name.casefold(), podcast.title.casefold()}
-            size = 0
-            for path in podcast.files:
-                try:
-                    size += path.stat().st_size
-                except OSError:
-                    pass
-            newest = podcast.episodes[0] if podcast.episodes else None
-            out.append({
-                "name": podcast.name,
-                "title": podcast.title,
-                "kind": podcast.folder.parent.name if podcast.folder.parent != config.library else "",
-                "episodes": len(podcast.episodes),
-                "bytes": size,
-                "newest": newest.title if newest else None,
-                "newest_date": newest.published.date().isoformat() if newest else None,
-                "published": wanted is None or bool(wanted & names),
-                "url": self.urls.get(podcast.name),
+        choices = self.selection(config, podcasts)
+        return [self._summary(config, choices, p) for p in podcasts]
+
+    def podcast(self, name: str) -> dict | None:
+        """One podcast with all of its episodes, and which of them are published."""
+        config = self.config()
+        podcasts = library.scan(config.library)
+        found = next((p for p in podcasts if p.name == name), None)
+        if found is None:
+            return None
+        return self._detail(config, self.selection(config, podcasts), found)
+
+    def choose(self, name: str, body: dict) -> dict | None:
+        """Change what is published of podcast ``name``; see :meth:`Selection.set`."""
+        published, auto = body.get("published"), body.get("auto")
+        episodes = body.get("episodes")
+        if published is not None and not isinstance(published, bool):
+            raise ValueError("'published' should be true or false.")
+        if auto is not None and not isinstance(auto, bool):
+            raise ValueError("'auto' should be true or false.")
+        if episodes is not None and not (
+            isinstance(episodes, dict) and all(isinstance(v, bool) for v in episodes.values())
+        ):
+            raise ValueError("'episodes' should map episodes to true or false.")
+        config = self.config()
+        podcasts = library.scan(config.library)
+        found = next((p for p in podcasts if p.name == name), None)
+        if found is None:
+            return None
+        self.selection(config, podcasts)
+        with self._choices:
+            choices = Selection.load(config.selection, config.feeds)
+            choices.set(found, published=published, auto=auto, episodes=episodes)
+            choices.save()
+        logger.info(
+            "%s: %s, %d of %d episode(s) chosen; published at the next sync.",
+            found.name,
+            "published" if choices.published(found) else "not published",
+            sum(choices.included(found, e) for e in found.episodes),
+            len(found.episodes),
+        )
+        return self._detail(config, choices, found)
+
+    def _summary(self, config, choices: Selection, podcast: library.Podcast) -> dict:
+        included = [e for e in podcast.episodes if choices.included(podcast, e)]
+        newest = podcast.episodes[0] if podcast.episodes else None
+        return {
+            "name": podcast.name,
+            "title": podcast.title,
+            "kind": podcast.folder.parent.name if podcast.folder.parent != config.library else "",
+            "episodes": len(podcast.episodes),
+            "included": len(included),
+            "bytes": sum(_size(e.audio) for e in included),
+            "newest": newest.title if newest else None,
+            "newest_date": newest.published.date().isoformat() if newest else None,
+            "published": choices.published(podcast),
+            "chosen": choices.chosen(podcast),
+            "auto": choices.auto(podcast),
+            "url": self.urls.get(podcast.name),
+        }
+
+    def _detail(self, config, choices: Selection, podcast: library.Podcast) -> dict:
+        episodes = []
+        for episode in podcast.episodes:
+            key = episode_key(podcast, episode)
+            folder = Path(key).parent.as_posix()
+            episodes.append({
+                "key": key,
+                "title": episode.title,
+                "published": episode.published.date().isoformat(),
+                "duration": episode.duration,
+                "bytes": _size(episode.audio),
+                "season": "" if folder == "." else folder,
+                "number": episode.number,
+                "included": choices.included(podcast, episode),
             })
-        return out
+        return {"podcast": self._summary(config, choices, podcast), "episodes": episodes}
+
+
+def _size(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
 
 
 def _dropbox(config) -> DropboxRemote:
@@ -386,7 +468,8 @@ class Handler(BaseHTTPRequestHandler):
         if not length:
             return {}
         try:
-            data = json.loads(self.rfile.read(min(length, 100_000)))
+            # A show's every episode, ticked or not, fits with room to spare.
+            data = json.loads(self.rfile.read(min(length, 4_000_000)))
         except ValueError:
             return {}
         return data if isinstance(data, dict) else {}
@@ -408,6 +491,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, svc.status())
             elif path == "/api/podcasts":
                 self._json(HTTPStatus.OK, {"podcasts": svc.podcasts()})
+            elif path == "/api/podcast":
+                name = (parse_qs(urlsplit(self.path).query).get("name") or [""])[0]
+                detail = svc.podcast(name)
+                if detail is None:
+                    self._json(HTTPStatus.NOT_FOUND, {"error": f"No podcast called {name!r}."})
+                else:
+                    self._json(HTTPStatus.OK, detail)
             elif path == "/api/activity":
                 self._json(HTTPStatus.OK, {"activity": list(svc.activity)})
             elif path.startswith("/api/jobs/"):
@@ -430,6 +520,20 @@ class Handler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.ACCEPTED, self.service.sync(dry_run=bool(body.get("dry_run"))).view())
         elif path == "/api/check":
             self._json(HTTPStatus.ACCEPTED, self.service.check().view())
+        elif path == "/api/podcast":
+            name = body.get("name")
+            try:
+                detail = self.service.choose(name, body) if isinstance(name, str) else None
+            except ValueError as exc:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            except (ConfigError, library.LibraryError, OSError) as exc:
+                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
+            if detail is None:
+                self._json(HTTPStatus.NOT_FOUND, {"error": f"No podcast called {name!r}."})
+            else:
+                self._json(HTTPStatus.OK, detail)
         else:
             self._json(HTTPStatus.NOT_FOUND, {"error": "Not found."})
 

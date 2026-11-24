@@ -14,9 +14,11 @@ REFRESH_TOKEN_ENV = "DB_PODCAST_REFRESH_TOKEN"
 LIBRARY_ENV = "DB_PODCAST_LIBRARY"
 REMOTE_ROOT_ENV = "DB_PODCAST_REMOTE_ROOT"
 FEEDS_ENV = "DB_PODCAST_FEEDS"
+SELECTION_ENV = "DB_PODCAST_SELECTION"
 
 DEFAULT_LIBRARY = "~/fetchit"
 DEFAULT_REMOTE_ROOT = "/podcasts"
+DEFAULT_SELECTION = "~/.config/db-podcast/selection.json"
 ENV_FILE = ".env"
 
 
@@ -33,7 +35,13 @@ class Config:
     app_key: str | None
     refresh_token: str | None
     feeds: list[str] | None = None
-    """The podcasts to publish, by name; ``None`` for every one in the library."""
+    """The podcasts to publish, by name; ``None`` for every one in the library.
+
+    Only until the choices are first written down (see
+    :meth:`db_podcast.selection.Selection.adopt`): from then on what is chosen,
+    in :attr:`selection`, wins."""
+    selection: Path = Path(DEFAULT_SELECTION).expanduser()
+    """The file with the choices made in the GUI (see :mod:`db_podcast.selection`)."""
 
     def credentials(self) -> tuple[str, str]:
         """Return the app key and refresh token, or say how to get them."""
@@ -54,6 +62,7 @@ def get_config(env_file: str | Path = ENV_FILE) -> Config:
         app_key=os.environ.get(APP_KEY_ENV) or None,
         refresh_token=os.environ.get(REFRESH_TOKEN_ENV) or None,
         feeds=parse_feeds(os.environ.get(FEEDS_ENV)),
+        selection=Path(os.environ.get(SELECTION_ENV) or DEFAULT_SELECTION).expanduser(),
     )
 
 

@@ -22,4 +22,6 @@ export DB_PODCAST_APP_KEY DB_PODCAST_REFRESH_TOKEN DB_PODCAST_LIBRARY \
 DB_PODCAST_SCHEDULE="$(jq -r '(.schedule // []) | join(",")' /data/options.json)"
 export DB_PODCAST_SCHEDULE
 export DB_PODCAST_URLS="/data/feed-urls.json"
+# What the panel's podcast tabs switch on and tick; /media is read only.
+export DB_PODCAST_SELECTION="/data/selection.json"
 export DB_PODCAST_GUI_FROM="172.30.32.2"

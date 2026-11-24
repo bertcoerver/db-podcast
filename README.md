@@ -54,7 +54,10 @@ export DB_PODCAST_FEEDS="Bureau Buitenland, Mes premières Belles Histoires"
 A podcast is any feed in `podcasts/` (audio) or `shows/` (video — podcast apps play
 video too) that has something to play. Leave `DB_PODCAST_FEEDS` empty to publish
 all of them. Names are the feeds' names in fetchit.json, or their titles, ignoring
-case. Titles, descriptions, dates, episode numbers and artwork all come from what
+case. That is only where it starts: the first sync writes down what is published
+in `DB_PODCAST_SELECTION`'s file, and from then on that file decides — edited in
+the GUI of `db-podcast serve` — and a podcast that is new in the library waits
+there, switched off, until you switch it on. Titles, descriptions, dates, episode numbers and artwork all come from what
 fetchit recorded beside each file; a series keeps its season folders in Dropbox.
 
 A feed that has both audio and video in the library is two podcasts; the video one
@@ -118,8 +121,9 @@ Environment variables, or lines in `.env` (see `.env.example`):
 | `DB_PODCAST_APP_KEY` | | written by `db-podcast auth` |
 | `DB_PODCAST_REFRESH_TOKEN` | | written by `db-podcast auth` |
 | `DB_PODCAST_LIBRARY` | `~/fetchit` | also `--library` |
-| `DB_PODCAST_FEEDS` | all | comma-separated feed names; also `--feed`, repeatable |
+| `DB_PODCAST_FEEDS` | all | comma-separated feed names: what is published until the first sync writes down the choices |
 | `DB_PODCAST_REMOTE_ROOT` | `/podcasts` | the folder in Dropbox to mirror to |
+| `DB_PODCAST_SELECTION` | `~/.config/db-podcast/selection.json` | what is chosen in the GUI's podcast tabs |
 
 ## Development
 
@@ -136,7 +140,10 @@ DB_PODCAST_SCHEDULE=02:00,07:00,15:30 db-podcast serve   # http://127.0.0.1:8099
 
 `db-podcast serve` stays running, syncs at those times, and serves a page listing
 every podcast, whether it is published, and its subscribe URL, with sync / dry
-run / check buttons. Only this machine may open it, unless `DB_PODCAST_GUI_FROM`
+run / check buttons. Each podcast has a tab where it is switched on or off, its
+episodes are ticked, and new episodes are added automatically or wait to be
+ticked. Those choices go to `DB_PODCAST_SELECTION`'s file, never the library,
+and `sync` follows them from the command line as well. Only this machine may open it, unless `DB_PODCAST_GUI_FROM`
 lists other addresses.
 
 ## Running it on Home Assistant

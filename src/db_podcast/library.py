@@ -147,10 +147,10 @@ def scan(library: str | Path, names: list[str] | None = None) -> list[Podcast]:
             podcasts.append(podcast)
 
     if wanted is not None:
-        podcasts = [p for p in podcasts if wanted & _names(p)]
+        podcasts = [p for p in podcasts if wanted & aliases(p)]
 
     if wanted is not None:
-        found = set().union(*(_names(p) for p in podcasts))
+        found = set().union(*(aliases(p) for p in podcasts))
         missing = sorted(wanted - found)
         if missing:
             raise LibraryError(
@@ -160,7 +160,7 @@ def scan(library: str | Path, names: list[str] | None = None) -> list[Podcast]:
     return podcasts
 
 
-def _names(podcast: Podcast) -> set[str]:
+def aliases(podcast: Podcast) -> set[str]:
     """What a podcast can be asked for by: its folder, its name, its title."""
     return {podcast.folder.name.casefold(), podcast.name.casefold(), podcast.title.casefold()}
 

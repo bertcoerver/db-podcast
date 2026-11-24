@@ -32,15 +32,16 @@ like a password.
 |---|---|---|
 | `app_key` | — | Your Dropbox app's key. |
 | `refresh_token` | — | From `db-podcast auth`. |
-| `feeds` | (all) | The feeds to publish, by their name in fetchit.json. Empty publishes every audio and video feed in the library. |
+| `feeds` | (all) | Read once, the first time the add-on finds the library: which podcasts start out published. Names from fetchit.json; empty is every audio and video feed. After that, the panel decides. |
 | `remote_root` | `/podcasts` | The folder in Dropbox to mirror to. Anything in it that is not published is deleted. |
 | `library` | `/media/fetchit` | fetchit's library. |
 | `on_start` | `wait` | `wait`, `dry-run` (say what would be uploaded and deleted) or `run`. |
 | `schedule` | `02:00`, `07:00`, `15:30` | Local times to sync at — a little after fetchit's runs. |
 | `log_level` | `info` | |
 
-Start it, open the panel, and press **Sync now**: each published podcast then
-shows the URL to subscribe to it with in a podcast app. The URLs stay the same for as long as
+Start it, open the panel, choose what to publish in each podcast's tab, and
+press **Sync now**: each published podcast then shows the URL to subscribe to it
+with in a podcast app. The URLs stay the same for as long as
 the feeds are published.
 
 ## The panel
@@ -53,10 +54,31 @@ feeds the way a podcast app would, with what each printed. The URLs are kept in
 the add-on's `/data`, so they are there after a restart; a feed's URL stays the
 same for as long as it is published.
 
+Every podcast fetchit has filed has a tab of its own, with every episode in the
+library:
+
+- **Publish this podcast** switches the whole podcast on or off.
+- **Add new episodes automatically**: on, every episode fetchit downloads is
+  published at the next sync; off, new episodes wait in the tab, unticked.
+  Switching it only decides for episodes still to come.
+- **A tick per episode** says whether it is in the feed. Shift-click ticks a
+  range.
+
+Choices are saved as you click, in `/data/selection.json`, and Dropbox follows
+at the next sync (or **Sync now**). A podcast that appears in fetchit's library
+later starts **switched off**: it is listed with its episodes, but nothing goes to
+Dropbox until you switch it on.
+
+The first time the add-on finds podcasts in the library it writes down what is
+published then — what the `feeds` option said — so updating to this version takes
+nothing off the air.
+
 ## Things to know
 
 - **The library is the truth.** An episode fetchit prunes (its `keep_days`) is
-  deleted from Dropbox on the next sync, and so is a feed you take out of `feeds`.
+  deleted from Dropbox on the next sync, and so is an episode you untick or a
+  podcast you switch off. Switching a podcast off and on again gives it a new
+  subscribe URL.
   A free Dropbox holds 2 GB: give published feeds a `keep_days` in fetchit.json that
   keeps them inside it.
 - **Video feeds work too**, and podcast apps play them, but they fill a Dropbox

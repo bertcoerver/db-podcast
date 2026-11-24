@@ -7,13 +7,13 @@
 <style>
   :root {
     --bg: #f6f7f9; --card: #ffffff; --text: #1d2228; --muted: #66707b;
-    --line: #e2e5e9; --accent: #8a4bd6; --accent-text: #ffffff;
+    --line: #e2e5e9; --accent: #8a4bd6; --accent-text: #ffffff; --accent-soft: #f1e9fb;
     --ok: #1f8a4c; --bad: #c4362c; --warn: #a86a00; --code: #f0f2f5;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #111418; --card: #1b1f24; --text: #e6e8eb; --muted: #9aa3ad;
-      --line: #2c323a; --accent: #b48af0; --accent-text: #0b0e12;
+      --line: #2c323a; --accent: #b48af0; --accent-text: #0b0e12; --accent-soft: #2a2238;
       --ok: #4cc27f; --bad: #f07067; --warn: #e0a640; --code: #242a31;
     }
   }
@@ -21,14 +21,28 @@
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 1100px; margin: 0 auto; padding: 16px; }
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin: 4px 0 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin: 4px 0 12px; }
   header h1 { font-size: 22px; margin: 0; }
   header .meta { color: var(--muted); font-size: 13px; }
+
+  nav.tabs { position: sticky; top: 0; z-index: 2; background: var(--bg); display: flex; gap: 4px;
+             overflow-x: auto; border-bottom: 1px solid var(--line); margin: 0 -16px 16px; padding: 0 16px; scrollbar-width: thin; }
+  nav.tabs a { flex: none; display: flex; align-items: center; gap: 6px; max-width: 240px; padding: 8px 12px;
+               color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+  nav.tabs a span.t { overflow: hidden; text-overflow: ellipsis; }
+  nav.tabs a:hover { color: var(--text); }
+  nav.tabs a.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+  .dot.live { background: var(--ok); }
+
   .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .stack { display: grid; gap: 16px; }
   section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
   section.wide { grid-column: 1 / -1; }
-  h2 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  h2 { font-size: 15px; margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  h2.big { font-size: 19px; }
   h2 .spacer { flex: 1; }
+  h2 .muted { font-weight: 400; font-size: 13px; }
   dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 14px; }
   dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
   button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
@@ -36,23 +50,34 @@
   button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
   button:disabled { opacity: .5; cursor: default; }
   button.small { padding: 2px 8px; font-size: 13px; }
-  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .table-wrap { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: 14px; }
   th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
   th { color: var(--muted); font-weight: 500; white-space: nowrap; }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.tick, th.tick { width: 28px; padding-right: 0; }
   tr.off td { color: var(--muted); }
+  tr.link { cursor: pointer; } tr.link:hover td { background: var(--accent-soft); }
+  table.episodes tbody tr { cursor: pointer; }
+  table.episodes tbody tr:hover td { background: var(--accent-soft); }
+  .dim { opacity: .55; }
+  input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); margin: 2px 0 0; cursor: pointer; }
   pre { background: var(--code); border-radius: 7px; padding: 10px; margin: 8px 0 0; font-size: 12.5px;
         max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
   .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); } .muted { color: var(--muted); }
-  .pill { display: inline-block; font-size: 12px; padding: 0 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .pill { display: inline-block; font-size: 12px; font-weight: 400; padding: 0 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
   .url { display: flex; gap: 6px; align-items: center; }
   .url input { flex: 1; min-width: 180px; font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text);
                background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
   ul.activity { list-style: none; margin: 0; padding: 0; font-size: 14px; max-height: 300px; overflow: auto; }
   ul.activity li { padding: 5px 0; border-bottom: 1px solid var(--line); display: flex; gap: 8px; }
   ul.activity time { color: var(--muted); font-size: 12px; white-space: nowrap; padding-top: 2px; }
+  .switches { display: grid; gap: 10px; }
+  label.switch { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+  label.switch b { display: block; font-weight: 600; }
+  label.switch small { display: block; color: var(--muted); font-size: 13px; }
+  .savebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; margin-top: 12px; }
   .hidden { display: none !important; }
   code { background: var(--code); border-radius: 4px; padding: 0 4px; font-size: 13px; }
 </style>
@@ -64,7 +89,14 @@
     <span class="meta" id="meta">…</span>
   </header>
 
-  <div class="grid">
+  <nav class="tabs" id="tabs"><a href="#" class="on"><span class="t">Overview</span></a></nav>
+
+  <section id="jobbar" class="hidden" style="margin-bottom:16px">
+    <div class="actions"><span id="job-line" style="flex:1"></span><button class="small" id="job-toggle">Details</button></div>
+    <pre id="job-output" class="hidden"></pre>
+  </section>
+
+  <div id="view-overview" class="grid">
     <section>
       <h2>Status</h2>
       <dl id="status"></dl>
@@ -77,8 +109,7 @@
         <button data-job="dry-run">Dry run</button>
         <button data-job="check">Check the feeds</button>
       </div>
-      <p class="muted" id="job-line" style="margin:10px 0 0">A sync uploads what is new, deletes what has gone, and publishes each feed. "Check" fetches the published feeds and their files the way a podcast app would.</p>
-      <pre id="job-output" class="hidden"></pre>
+      <p class="muted" style="margin:10px 0 0">A sync uploads what is chosen and new, deletes from Dropbox what is no longer chosen or no longer in the library, and publishes each feed. A dry run only says what a sync would do. "Check" fetches the published feeds and their files the way a podcast app would.</p>
     </section>
 
     <section class="wide">
@@ -89,7 +120,7 @@
           <tbody id="podcasts"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
         </table>
       </div>
-      <p class="muted" style="margin-bottom:0">Which feeds are published is the add-on's <code>feeds</code> option. A feed URL appears after the first sync, and stays the same for as long as the feed is published.</p>
+      <p class="muted" style="margin-bottom:0">Everything fetchit has filed under <code>podcasts/</code> and <code>shows/</code>. Open a podcast to switch it on or off and choose its episodes. A podcast new in the library starts switched off. A feed URL appears after the first sync, and stays the same for as long as the podcast is published.</p>
     </section>
 
     <section class="wide">
@@ -97,6 +128,8 @@
       <ul class="activity" id="activity"><li class="muted">Nothing since the add-on started.</li></ul>
     </section>
   </div>
+
+  <div id="view-podcast" class="stack hidden"></div>
 </main>
 
 <script>
@@ -104,7 +137,13 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const when = (iso) => iso ? new Date(iso).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : "—";
+const day = (iso) => iso ? new Date(iso + "T12:00:00").toLocaleDateString([], {dateStyle: "medium"}) : "—";
 const size = (b) => !b ? "—" : b > 1e9 ? (b / 1e9).toFixed(1) + " GB" : b > 1e6 ? Math.round(b / 1e6) + " MB" : Math.round(b / 1e3) + " kB";
+const length = (s) => {
+  if (s == null) return "—";
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`;
+};
 
 async function api(path, options = {}) {
   const init = {...options, headers: {"Content-Type": "application/json"}};
@@ -116,17 +155,46 @@ async function api(path, options = {}) {
   return data;
 }
 
-let watching = null;
+let status = null;      // the last /api/status
+let podcasts = [];      // the last /api/podcasts
+let watching = null;    // the job being followed
+
+// ---- tabs -------------------------------------------------------------------
+
+const current = () => {
+  const m = location.hash.match(/^#p=(.*)$/);
+  return m ? decodeURIComponent(m[1]) : null;
+};
+const tabHref = (name) => "#p=" + encodeURIComponent(name);
+
+function renderTabs() {
+  const open = current();
+  $("tabs").innerHTML = `<a href="#" class="${open === null ? "on" : ""}"><span class="t">Overview</span></a>` +
+    podcasts.map(p => `<a href="${tabHref(p.name)}" class="${open === p.name ? "on" : ""}" title="${esc(p.title)}${p.kind ? " · " + esc(p.kind) : ""}">
+      <span class="dot ${p.published ? "live" : ""}"></span><span class="t">${esc(p.title)}</span>${p.kind === "shows" ? ` <span class="pill">video</span>` : ""}</a>`).join("");
+  const on = $("tabs").querySelector("a.on");
+  if (on) on.scrollIntoView({block: "nearest", inline: "nearest"});
+}
+
+function route() {
+  const open = current();
+  renderTabs();
+  $("view-overview").classList.toggle("hidden", open !== null);
+  $("view-podcast").classList.toggle("hidden", open === null);
+  if (open !== null) loadPodcast(open);
+}
+window.addEventListener("hashchange", route);
+
+// ---- overview ---------------------------------------------------------------
 
 async function loadStatus() {
-  let s;
-  try { s = await api("api/status"); } catch (e) { $("meta").textContent = "Cannot reach db-podcast: " + e.message; return; }
+  try { status = await api("api/status"); } catch (e) { $("meta").textContent = "Cannot reach db-podcast: " + e.message; return; }
+  const s = status;
   $("meta").textContent = `version ${s.version}`;
   const rows = [
     ["Dropbox", s.connected ? `<span class="ok">connected</span> · <code>${esc(s.remote_root)}</code>`
                             : `<span class="bad">not set up</span> — set <code>app_key</code> and <code>refresh_token</code>`],
     ["Library", esc(s.library) + (s.library_exists ? "" : ` <span class="bad">(missing)</span>`)],
-    ["Publishing", s.feeds ? esc(s.feeds.join(", ")) : "every podcast in the library"],
     ["Schedule", s.schedule.length ? esc(s.schedule.join(", ")) : `<span class="muted">none — only when asked</span>`],
     ["Next sync", s.running ? `<span class="warn">running now</span>` : esc(when(s.next_run))],
   ];
@@ -134,27 +202,29 @@ async function loadStatus() {
   if (s.running && !watching) watchJob(s.running.id);
 }
 
+function urlField(p, id) {
+  if (!p.published) return `<span class="muted">not published</span>`;
+  if (!p.url) return `<span class="muted">after the next sync</span>`;
+  return `<div class="url"><input readonly value="${esc(p.url)}" id="${id}"><button class="small" data-copy="${id}">Copy</button></div>`;
+}
+
 async function loadPodcasts() {
   try {
-    const {podcasts} = await api("api/podcasts");
-    if (!podcasts.length) { $("podcasts").innerHTML = `<tr><td colspan="4" class="muted">Nothing with audio or video in the library yet.</td></tr>`; return; }
-    $("podcasts").innerHTML = podcasts.map((p, i) => {
-      const name = `<b>${esc(p.title)}</b>` + (p.title !== p.name ? `<br><span class="muted">${esc(p.name)}</span>` : "")
-        + (p.kind ? ` <span class="pill">${esc(p.kind)}</span>` : "");
-      const url = !p.published ? `<span class="muted">not published</span>`
-        : p.url ? `<div class="url"><input readonly value="${esc(p.url)}" id="u${i}"><button class="small" data-copy="u${i}">Copy</button></div>`
-        : `<span class="muted">after the next sync</span>`;
-      return `<tr class="${p.published ? "" : "off"}"><td>${name}</td><td class="num">${p.episodes}<br><span class="muted">${size(p.bytes)}</span></td>
-        <td>${esc(p.newest || "—")}<br><span class="muted">${esc(p.newest_date || "")}</span></td><td>${url}</td></tr>`;
-    }).join("");
-    document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", async () => {
-      const input = $(b.dataset.copy);
-      try { await navigator.clipboard.writeText(input.value); } catch (e) { input.select(); document.execCommand("copy"); }
-      b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1500);
-    }));
+    ({podcasts} = await api("api/podcasts"));
   } catch (e) {
     $("podcasts").innerHTML = `<tr><td colspan="4" class="bad">${esc(e.message)}</td></tr>`;
+    return;
   }
+  renderTabs();
+  if (!podcasts.length) { $("podcasts").innerHTML = `<tr><td colspan="4" class="muted">Nothing with audio or video in the library yet.</td></tr>`; return; }
+  $("podcasts").innerHTML = podcasts.map((p, i) => {
+    const name = `<b>${esc(p.title)}</b>` + (p.kind ? ` <span class="pill">${esc(p.kind)}</span>` : "")
+      + (p.title !== p.name ? `<br><span class="muted">${esc(p.name)}</span>` : "");
+    const count = p.published ? `${p.included} of ${p.episodes}<br><span class="muted">${size(p.bytes)}</span>`
+                              : `<span class="muted">${p.episodes}</span>`;
+    return `<tr class="link ${p.published ? "" : "off"}" data-open="${esc(p.name)}"><td>${name}</td><td class="num">${count}</td>
+      <td>${esc(p.newest || "—")}<br><span class="muted">${esc(day(p.newest_date))}</span></td><td>${urlField(p, "u" + i)}</td></tr>`;
+  }).join("");
 }
 
 async function loadActivity() {
@@ -165,12 +235,169 @@ async function loadActivity() {
   } catch (e) { /* keep what was there */ }
 }
 
+// ---- one podcast ------------------------------------------------------------
+
+let shown = null;          // {podcast, episodes} of the open tab
+let lastTick = null;       // index of the last episode ticked, for shift-click
+let saveTimer = null, saving = Promise.resolve(), dirty = false;
+
+async function loadPodcast(name) {
+  if (dirty && shown && shown.podcast.name !== name) await flush();
+  if (!shown || shown.podcast.name !== name) $("view-podcast").innerHTML = `<section class="muted">Loading…</section>`;
+  try {
+    shown = await api("api/podcast?name=" + encodeURIComponent(name));
+  } catch (e) {
+    shown = null;
+    $("view-podcast").innerHTML = `<section class="bad">${esc(e.message)}</section>`;
+    return;
+  }
+  lastTick = null;
+  renderPodcast();
+}
+
+function nextSync() {
+  return status && status.next_run ? `at the next sync, ${esc(when(status.next_run))}` : "at the next sync";
+}
+
+function renderPodcast() {
+  const {podcast: p, episodes} = shown;
+  const seasons = episodes.some(e => e.season);
+  const ticked = episodes.filter(e => e.included);
+  const tickedBytes = ticked.reduce((n, e) => n + e.bytes, 0);
+  const unpublishNote = !p.published && p.url
+    ? `<p class="warn" style="margin:10px 0 0">Switched off: the next sync deletes it from Dropbox, and whoever subscribed to it gets nothing new. Switched on again later, it gets a new subscribe URL.</p>` : "";
+
+  $("view-podcast").innerHTML = `
+    <section>
+      <h2 class="big">${esc(p.title)} ${p.kind ? `<span class="pill">${esc(p.kind)}</span>` : ""}</h2>
+      <div class="switches">
+        <label class="switch"><input type="checkbox" id="pub" ${p.published ? "checked" : ""}>
+          <span><b>Publish this podcast</b><small>Put the ticked episodes in Dropbox, with a feed to subscribe to.</small></span></label>
+        <label class="switch"><input type="checkbox" id="auto" ${p.auto ? "checked" : ""}>
+          <span><b>Add new episodes automatically</b><small>${p.auto
+            ? "Every episode fetchit downloads from now on is ticked, and published at the sync after it arrives."
+            : "Episodes fetchit downloads from now on wait here, unticked, until you tick them."}</small></span></label>
+      </div>
+      ${unpublishNote}
+      ${p.published ? `<dl style="margin-top:14px"><dt>Subscribe with</dt><dd>${urlField(p, "u-open")}</dd></dl>` : ""}
+    </section>
+
+    <section class="${p.published ? "" : "dim"}">
+      <h2>Episodes <span class="muted">${ticked.length} of ${episodes.length} ticked · ${size(tickedBytes)}</span>
+        <span class="spacer"></span>
+        <button class="small" data-all="1">Tick all</button><button class="small" data-all="0">Untick all</button></h2>
+      ${episodes.length ? `<div class="table-wrap"><table class="episodes">
+        <thead><tr><th class="tick"></th><th>Episode</th><th>Date</th><th class="num">Length</th><th class="num">Size</th></tr></thead>
+        <tbody>${episodes.map((e, i) => `<tr data-i="${i}" class="${e.included ? "" : "off"}">
+          <td class="tick"><input type="checkbox" data-i="${i}" ${e.included ? "checked" : ""} aria-label="Publish ${esc(e.title)}"></td>
+          <td>${esc(e.title)}${seasons && e.season ? ` <span class="pill">${esc(e.season)}</span>` : ""}${e.number != null ? ` <span class="muted">#${e.number}</span>` : ""}</td>
+          <td style="white-space:nowrap">${esc(day(e.published))}</td>
+          <td class="num">${length(e.duration)}</td>
+          <td class="num">${size(e.bytes)}</td></tr>`).join("")}</tbody></table></div>`
+        : `<p class="muted">Nothing to play in it yet.</p>`}
+      <div class="savebar"><span id="saved" class="muted">${p.published
+        ? `Ticked episodes go to Dropbox ${nextSync()}; unticked ones are taken out of it. Shift-click ticks a range.`
+        : "Not published, so none of it is in Dropbox. The ticks are kept for when it is."}</span>
+        <span class="spacer" style="flex:1"></span><button class="primary small" data-job="sync">Sync now</button></div>
+    </section>`;
+  setRunning(!!watching);
+}
+
+function tick(i, on) {
+  shown.episodes[i].included = on;
+  const row = $("view-podcast").querySelector(`tr[data-i="${i}"]`);
+  if (row) { row.classList.toggle("off", !on); row.querySelector("input").checked = on; }
+}
+
+function changed() {
+  dirty = true;
+  const {episodes} = shown;
+  const ticked = episodes.filter(e => e.included);
+  const h2 = $("view-podcast").querySelector("table.episodes")?.closest("section").querySelector("h2 .muted");
+  if (h2) h2.textContent = `${ticked.length} of ${episodes.length} ticked · ${size(ticked.reduce((n, e) => n + e.bytes, 0))}`;
+  $("saved").innerHTML = `<span class="muted">Saving…</span>`;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flush, 500);
+}
+
+function flush() {
+  clearTimeout(saveTimer);
+  if (!dirty || !shown) return saving;
+  dirty = false;
+  const {podcast: p, episodes} = shown;
+  const body = {name: p.name, published: p.published, auto: p.auto,
+                episodes: Object.fromEntries(episodes.map(e => [e.key, e.included]))};
+  saving = saving.then(async () => {
+    try {
+      const fresh = await api("api/podcast", {method: "POST", body});
+      if (shown && shown.podcast.name === fresh.podcast.name) {
+        shown.podcast = fresh.podcast;
+        const el = $("saved");
+        if (el && !dirty) el.innerHTML = fresh.podcast.published
+          ? `<span class="ok">Saved.</span> <span class="muted">Dropbox follows ${nextSync()}.</span>`
+          : `<span class="ok">Saved.</span> <span class="muted">Not published.</span>`;
+      }
+      const i = podcasts.findIndex(x => x.name === fresh.podcast.name);
+      if (i >= 0) { podcasts[i] = fresh.podcast; renderTabs(); }
+    } catch (e) {
+      dirty = true;
+      const el = $("saved");
+      if (el) el.innerHTML = `<span class="bad">Not saved: ${esc(e.message)}</span> <button class="small" id="retry">Try again</button>`;
+    }
+  });
+  return saving;
+}
+
+$("view-podcast").addEventListener("click", (ev) => {
+  if (!shown) return;
+  const t = ev.target;
+  if (t.id === "retry") { flush(); return; }
+  if (t.dataset.all !== undefined) {
+    shown.episodes.forEach((_, i) => tick(i, t.dataset.all === "1"));
+    changed(); return;
+  }
+  const row = t.closest("table.episodes tbody tr");
+  if (!row) return;
+  const i = Number(row.dataset.i);
+  // A click on the row ticks like a click on its box.
+  const on = t.matches("input[type=checkbox]") ? t.checked : !shown.episodes[i].included;
+  if (ev.shiftKey && lastTick !== null) {
+    const [a, b] = [Math.min(lastTick, i), Math.max(lastTick, i)];
+    for (let k = a; k <= b; k++) tick(k, on);
+    window.getSelection()?.removeAllRanges();
+  } else {
+    tick(i, on);
+  }
+  lastTick = i;
+  changed();
+});
+
+$("view-podcast").addEventListener("change", (ev) => {
+  if (!shown) return;
+  if (ev.target.id === "pub" || ev.target.id === "auto") {
+    shown.podcast[ev.target.id === "pub" ? "published" : "auto"] = ev.target.checked;
+    dirty = true;
+    flush().then(() => { if (shown) renderPodcast(); });
+  }
+});
+
+// Leaving within the half second before a save: send it anyway.
+window.addEventListener("pagehide", () => {
+  if (!dirty || !shown) return;
+  const {podcast: p, episodes} = shown;
+  fetch("api/podcast", {method: "POST", keepalive: true, headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name: p.name, published: p.published, auto: p.auto,
+                          episodes: Object.fromEntries(episodes.map(e => [e.key, e.included]))})});
+});
+
+// ---- jobs -------------------------------------------------------------------
+
 function setRunning(on) { document.querySelectorAll("[data-job]").forEach(b => b.disabled = on); }
 
 async function watchJob(id) {
   if (watching === id) return;
   watching = id; setRunning(true);
-  $("job-output").classList.remove("hidden");
+  $("jobbar").classList.remove("hidden");
   for (;;) {
     let job;
     try { job = await api("api/jobs/" + id); } catch (e) { $("job-line").textContent = e.message; break; }
@@ -184,20 +411,50 @@ async function watchJob(id) {
     await new Promise(r => setTimeout(r, 1500));
   }
   watching = null; setRunning(false);
-  loadStatus(); loadPodcasts(); loadActivity();
+  await loadStatus(); await loadPodcasts(); loadActivity();
+  const open = current();
+  if (open !== null && !dirty) loadPodcast(open);
 }
 
-document.querySelectorAll("[data-job]").forEach(b => b.addEventListener("click", async () => {
-  const kind = b.dataset.job;
-  try {
-    const job = kind === "check" ? await api("api/check", {method: "POST", body: {}})
-                                 : await api("api/sync", {method: "POST", body: {dry_run: kind === "dry-run"}});
-    watchJob(job.id);
-  } catch (e) { $("job-line").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
-}));
+document.addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-job]");
+  if (b) {
+    const kind = b.dataset.job;
+    await flush();
+    try {
+      const job = kind === "check" ? await api("api/check", {method: "POST", body: {}})
+                                   : await api("api/sync", {method: "POST", body: {dry_run: kind === "dry-run"}});
+      watchJob(job.id);
+    } catch (e) {
+      $("jobbar").classList.remove("hidden");
+      $("job-line").innerHTML = `<span class="bad">${esc(e.message)}</span>`;
+    }
+    return;
+  }
+  const copy = ev.target.closest("[data-copy]");
+  if (copy) {
+    ev.stopPropagation();
+    const input = $(copy.dataset.copy);
+    try { await navigator.clipboard.writeText(input.value); } catch (e) { input.select(); document.execCommand("copy"); }
+    copy.textContent = "Copied"; setTimeout(() => copy.textContent = "Copy", 1500);
+    return;
+  }
+  const row = ev.target.closest("tr[data-open]");
+  if (row && !ev.target.closest(".url")) location.hash = tabHref(row.dataset.open);
+});
+
+$("job-toggle").addEventListener("click", () => {
+  const out = $("job-output");
+  out.classList.toggle("hidden");
+  $("job-toggle").textContent = out.classList.contains("hidden") ? "Details" : "Hide";
+});
 $("refresh").addEventListener("click", loadPodcasts);
 
-loadStatus(); loadPodcasts(); loadActivity();
+(async () => {
+  await Promise.all([loadStatus(), loadPodcasts()]);
+  loadActivity();
+  route();
+})();
 setInterval(() => { loadStatus(); loadActivity(); }, 10000);
 </script>
 </body>

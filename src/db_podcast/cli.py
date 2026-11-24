@@ -7,7 +7,9 @@ Subcommands:
     serve           sync on a schedule, with a web GUI
 
 Downloading is fetchit's job: point the library at the folder it fills, and
-choose which of its feeds become podcasts with ``--feed`` or DB_PODCAST_FEEDS.
+choose which of its feeds become podcasts, and which episodes, in the GUI of
+``serve``. DB_PODCAST_FEEDS is what is published before any choice was made,
+and ``--feed`` publishes just the podcasts it names, this once.
 """
 
 import argparse
@@ -27,6 +29,7 @@ from db_podcast.config import (
     save_dotenv,
 )
 from db_podcast.remote import DropboxRemote, RemoteError, authorization
+from db_podcast.selection import Selection
 
 logger = logging.getLogger("db_podcast")
 
@@ -53,7 +56,8 @@ def _cmd_sync(args: argparse.Namespace, config: Config) -> int:
         _remote(config),
         prune=not args.no_prune,
         dry_run=args.dry_run,
-        names=config.feeds,
+        names=args.feed,
+        selection=_selection(config),
     )
     if not published:
         logger.warning("No podcasts found in %s.", config.library)
@@ -67,7 +71,8 @@ def _cmd_check(args: argparse.Namespace, config: Config) -> int:
     remote = _remote(config)
     in_dropbox = {name.lower() for name in remote.list()}
     published = []
-    for podcast in library.scan(config.library, config.feeds):
+    selection = _selection(config)
+    for podcast in selection.choose(library.scan(config.library, args.feed), bool(args.feed)):
         feed_name = f"{podcast.name}/{library.FEED_FILE}"
         if feed_name.lower() in in_dropbox:
             published.append(sync.Published(podcast, remote.url(feed_name)))
@@ -88,6 +93,18 @@ def _cmd_serve(args: argparse.Namespace, config: Config) -> int:
     return 0
 
 
+def _selection(config: Config) -> Selection:
+    """The choices made in the GUI; the first time, what is published now."""
+    selection = Selection.load(config.selection, config.feeds)
+    try:
+        podcasts = library.scan(config.library)
+    except library.LibraryError:
+        return selection  # said again, and better, by what runs next
+    if selection.adopt(podcasts):
+        logger.info("Wrote down what is published now in %s.", config.selection)
+    return selection
+
+
 def _remote(config: Config) -> DropboxRemote:
     app_key, refresh_token = config.credentials()
     return DropboxRemote(app_key, refresh_token, config.remote_root)
@@ -103,7 +120,7 @@ def _parser() -> argparse.ArgumentParser:
         "--feed",
         action="append",
         metavar="NAME",
-        help="publish only this podcast (repeatable; default: $DB_PODCAST_FEEDS, or all)",
+        help="publish only this podcast, this once (repeatable; default: what is chosen in the GUI)",
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -143,8 +160,6 @@ def main(argv: list[str] | None = None) -> int:
         config = get_config()
         if args.library:
             config = replace(config, library=Path(args.library).expanduser())
-        if args.feed:
-            config = replace(config, feeds=args.feed)
         return args.run(args, config)
     except (ConfigError, library.LibraryError, RemoteError) as error:
         logger.error("%s", error)

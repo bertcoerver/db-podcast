@@ -29,9 +29,10 @@ def test_feeds_come_from_the_environment(monkeypatch, tmp_path):
 def test_feed_on_the_command_line_wins(monkeypatch, tmp_path):
     """Test that --feed replaces what the environment says, for this run."""
     monkeypatch.setenv(FEEDS_ENV, "A")
+    monkeypatch.setenv("DB_PODCAST_SELECTION", str(tmp_path / "selection.json"))
     seen = {}
 
-    def fake_sync(library, remote, prune=True, dry_run=False, names=None):
+    def fake_sync(library, remote, prune=True, dry_run=False, names=None, selection=None):
         seen.update(library=library, names=names)
         return []
 

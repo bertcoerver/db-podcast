@@ -25,6 +25,7 @@ from urllib.request import Request, urlopen
 from db_podcast import feed
 from db_podcast.library import FEED_FILE, Podcast, scan
 from db_podcast.remote import content_hash
+from db_podcast.selection import Selection
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ def sync(
     dry_run: bool = False,
     names: list[str] | None = None,
     feed_dir: str | Path | None = None,
+    selection: Selection | None = None,
 ) -> list[Published]:
     """Bring ``remote`` in line with ``library`` and publish the feeds.
 
@@ -69,12 +71,16 @@ def sync(
     dry_run
         Only log what would be uploaded and deleted.
     names
-        Only publish these podcasts (see :func:`db_podcast.library.scan`).
-        Everything else in Dropbox is pruned like a podcast that is gone.
+        Only publish these podcasts (see :func:`db_podcast.library.scan`),
+        whether or not ``selection`` has them published. Everything else in
+        Dropbox is pruned like a podcast that is gone.
     feed_dir
         Where to write each feed before uploading it, one sub-folder per
         podcast. A temporary folder when not given: what Dropbox has is
         compared by content, so nothing local needs keeping.
+    selection
+        Which podcasts and episodes to publish. Every one, when not given.
+        What is not chosen is pruned like what is gone from the library.
 
     Returns
     -------
@@ -83,10 +89,11 @@ def sync(
     """
     if feed_dir is None:
         with tempfile.TemporaryDirectory(prefix="db-podcast-") as work:
-            return sync(library, remote, prune, dry_run, names, work)
+            return sync(library, remote, prune, dry_run, names, work, selection)
     feed_dir = Path(feed_dir)
 
-    podcasts = scan(library, names)
+    in_library = scan(library, names)
+    podcasts = selection.choose(in_library, everything=names is not None) if selection else in_library
     # name as the remote compares it -> (name as the remote spells it, hash)
     remote_files = {_key(name): (name, hash_) for name, hash_ in remote.list().items()}
     mirror = _Mirror(remote, remote_files, dry_run)
@@ -116,7 +123,7 @@ def sync(
         published.append(Published(podcast, feed_url))
 
     if prune:
-        mirror.prune({_key(podcast.name) for podcast in podcasts})
+        mirror.prune({_key(podcast.name) for podcast in podcasts}, library_empty=not in_library)
     return published
 
 
@@ -186,12 +193,16 @@ class _Mirror:
             self._remote.upload(path, name)
             self._remote_files[_key(name)] = (name, hash_)
 
-    def prune(self, podcasts: set[str]) -> None:
-        """Delete what is on the remote without being in the library."""
+    def prune(self, podcasts: set[str], library_empty: bool) -> None:
+        """Delete what is on the remote without being published.
+
+        ``podcasts`` are the ones published, whose files are deleted one by
+        one; any other podcast is deleted as a whole folder.
+        """
         stale = [name for key, (name, _) in self._remote_files.items() if key not in self._kept]
         if not stale:
             return
-        if not podcasts:
+        if library_empty:
             # An empty library is far more likely to be a disk that is not
             # mounted than a wish to delete every podcast, and the feed URLs
             # that people subscribed to would be gone with them.
