@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Choose podcasts and episodes in the panel, a tab per podcast
+
 ## 0.1.7
 
 - First release installed from the add-on repository.
