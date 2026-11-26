@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- Publish an episode's smaller copy where fetchit keeps one
+
 ## 0.3.2
 
 - Sync as soon as fetchit says it downloaded something
