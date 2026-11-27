@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- Link to the feed and the artwork on Dropbox's content host too
+
 ## 0.4.1
 
 - Link to an episode as a download from Dropbox's content host
