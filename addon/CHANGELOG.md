@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Link to an episode as a download from Dropbox's content host
+- Go back to publishing the one file an episode has
+
 ## 0.4.0
 
 - Publish an episode's smaller copy where fetchit keeps one
