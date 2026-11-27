@@ -113,7 +113,7 @@ def build(
             item,
             "enclosure",
             url=urls[episode.audio],
-            length=str(episode.file.stat().st_size),
+            length=str(episode.audio.stat().st_size),
             type=episode.mime_type,
         )
         if episode.duration is not None:

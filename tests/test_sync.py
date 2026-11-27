@@ -347,36 +347,3 @@ def test_unreadable_cover_goes_up_as_it_is(library, tmp_path):
     sync(library, remote, feed_dir=tmp_path / "work")
 
     assert remote.files["show/cover.png"] == content_hash(cover)
-
-
-def test_sync_publishes_an_episodes_smaller_copy_under_its_own_name(fetchit_library):
-    stem = "Karambolage - S2026E101801 - Les feuilles"
-    season = fetchit_library / "shows" / "Karambolage" / "Season 2026"
-    small = fetchit_library / "small" / "Karambolage" / "Season 2026" / f"{stem}.mp4"
-    small.parent.mkdir(parents=True)
-    small.write_bytes(b"small video")
-    record = json.loads((season / f"{stem}.json").read_text())
-    record["small"] = f"small/Karambolage/Season 2026/{stem}.mp4"
-    (season / f"{stem}.json").write_text(json.dumps(record))
-
-    remote = FakeRemote()
-    (published,) = sync(fetchit_library, remote, names=["Karambolage"])
-
-    name = f"Karambolage/Season 2026/{stem}.mp4"
-    assert remote.files[name] == content_hash(small)
-    assert not any(existing.startswith("small") for existing in remote.files)
-    (episode,) = published.podcast.episodes
-    assert episode.audio == season / f"{stem}.mp4"
-    assert episode.file == small.resolve()
-
-
-def test_sync_publishes_the_episode_itself_when_its_smaller_copy_is_not_there(fetchit_library):
-    stem = "Karambolage - S2026E101801 - Les feuilles"
-    season = fetchit_library / "shows" / "Karambolage" / "Season 2026"
-    record = json.loads((season / f"{stem}.json").read_text())
-    record["small"] = "small/../shows/Karambolage/poster.jpg"
-    (season / f"{stem}.json").write_text(json.dumps(record))
-
-    remote = FakeRemote()
-    sync(fetchit_library, remote, names=["Karambolage"])
-    assert remote.files[f"Karambolage/Season 2026/{stem}.mp4"] == content_hash(season / f"{stem}.mp4")

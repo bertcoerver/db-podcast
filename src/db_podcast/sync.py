@@ -111,11 +111,7 @@ def sync(
     for podcast in podcasts:
         names = {path: remote_name(podcast, path) for path in podcast.files}
         for path, name in names.items():
-            if path == podcast.cover:
-                source = artwork(path, feed_dir / podcast.name)
-            else:
-                # An episode with a smaller copy goes up as that, under its own name.
-                source = podcast.sources.get(path, path)
+            source = artwork(path, feed_dir / podcast.name) if path == podcast.cover else path
             mirror.push(source, name)
         feed_name = f"{podcast.name}/{FEED_FILE}"
         mirror.keep(feed_name)

@@ -14,13 +14,6 @@ has a folder of its own and a podcast is any of those with media in it::
         shows/<Feed>/               video, one Season folder per year or season
             feed.json  poster.jpg
             Season 2026/<…>.mp4     + <…>-thumb.jpg, <…>.json
-        small/<Feed>/Season 2026/<…>.mp4    a video's smaller copy, if it has one
-
-A video's record may name a smaller copy of it (``small``, a path from the
-library's root): fetchit keeps one for a feed with ``quality.small`` set. Where
-an episode has one, that is the file that is published, under the episode's own
-name — a podcast is listened to on a phone, and the sharp copy is for a
-television.
 
 The other is a folder made by hand, one sub-folder per podcast::
 
@@ -64,8 +57,6 @@ MEDIA_TYPES = {
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png")
 
 PODCAST_FILE = "podcast.json"
-# Where a fetchit library keeps the smaller copies of its videos.
-SMALL_DIR = "small"
 # What fetchit calls the same thing, with the same keys.
 FETCHIT_FEED_FILE = "feed.json"
 FEED_FILE = "feed.xml"
@@ -93,17 +84,6 @@ class Episode:
     number: int | None
     duration: int | None
     cover: Path | None
-    small: Path | None = None
-    """A smaller copy of the same episode, where the library keeps one."""
-
-    @property
-    def file(self) -> Path:
-        """The file that is published: the smaller copy if there is one.
-
-        ``audio`` stays what the episode is known by — its name, its place in
-        the podcast's folder — whichever of the two is sent.
-        """
-        return self.small or self.audio
 
     @property
     def mime_type(self) -> str:
@@ -138,11 +118,6 @@ class Podcast:
         # An episode's artwork can double as the podcast's.
         return list(dict.fromkeys(files))
 
-    @property
-    def sources(self) -> dict[Path, Path]:
-        """For each of ``files`` that is published from another file, that file."""
-        return {e.audio: e.small for e in self.episodes if e.small}
-
 
 def scan(library: str | Path, names: list[str] | None = None) -> list[Podcast]:
     """Read the podcasts in ``library``.
@@ -168,7 +143,7 @@ def scan(library: str | Path, names: list[str] | None = None) -> list[Podcast]:
     podcasts = []
     taken: set[str] = set()
     for folder in _podcast_folders(library):
-        podcast = _read_podcast(folder, _unique(folder, taken), library)
+        podcast = _read_podcast(folder, _unique(folder, taken))
         if podcast.episodes:
             taken.add(podcast.name.casefold())
             podcasts.append(podcast)
@@ -220,11 +195,11 @@ def _unique(folder: Path, taken: set[str]) -> str:
     return name
 
 
-def _read_podcast(folder: Path, name: str, library: Path | None = None) -> Podcast:
+def _read_podcast(folder: Path, name: str) -> Podcast:
     metadata = _read_json(folder / PODCAST_FILE) or _read_json(folder / FETCHIT_FEED_FILE)
     top = {path.name.lower(): path for path in folder.iterdir() if path.is_file()}
 
-    episodes = [_read_episode(path, library) for path in _media(folder)]
+    episodes = [_read_episode(path) for path in _media(folder)]
     # Newest first, as podcast apps expect; the name settles a tie.
     episodes.sort(key=lambda episode: episode.audio.name)
     episodes.sort(key=lambda episode: episode.published, reverse=True)
@@ -265,7 +240,7 @@ def _media(folder: Path) -> list[Path]:
     return found
 
 
-def _read_episode(audio: Path, library: Path | None = None) -> Episode:
+def _read_episode(audio: Path) -> Episode:
     metadata = _read_json(audio.with_suffix(".json"))
     tag_title, duration = _read_tags(audio)
     title = metadata.get("title") or tag_title or audio.stem
@@ -277,24 +252,7 @@ def _read_episode(audio: Path, library: Path | None = None) -> Episode:
         number=_number(metadata.get("number"), audio),
         duration=duration,
         cover=_episode_image(audio, metadata),
-        small=_small(library, audio, metadata),
     )
-
-
-def _small(library: Path | None, audio: Path, metadata: dict) -> Path | None:
-    """The smaller copy an episode's record names, if it is one and it is there.
-
-    Only a file under the library's ``small`` folder, and only one of the same
-    type as the episode, which is published under the episode's name.
-    """
-    named = metadata.get("small")
-    if library is None or not isinstance(named, str) or not named:
-        return None
-    base = (library / SMALL_DIR).resolve()
-    path = (library / named).resolve()
-    if base not in path.parents or not path.is_file():
-        return None
-    return path if path.suffix.lower() == audio.suffix.lower() else None
 
 
 def _episode_image(audio: Path, metadata: dict) -> Path | None:
