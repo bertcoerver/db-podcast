@@ -119,7 +119,8 @@ def sync(
             published.append(Published(podcast, None))
             continue
 
-        urls = {path: remote.url(name) for path, name in names.items()}
+        audio = {episode.audio for episode in podcast.episodes}
+        urls = {path: remote.url(name, download=path in audio) for path, name in names.items()}
         feed_path = feed_dir / podcast.name / FEED_FILE
         feed_path.parent.mkdir(parents=True, exist_ok=True)
         if _key(feed_name) not in remote_files:

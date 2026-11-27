@@ -27,6 +27,7 @@ from db_podcast.remote import (
     authorization,
     content_hash,
     direct_url,
+    download_url,
 )
 
 
@@ -63,6 +64,21 @@ def test_direct_url(shared_link):
     """Test that a shared link becomes a link to the file, keeping its key."""
     assert direct_url(shared_link) == (
         "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y&raw=1"
+    )
+
+
+@pytest.mark.parametrize(
+    "shared_link",
+    [
+        "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y&dl=0",
+        "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y&raw=1",
+        "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y",
+    ],
+)
+def test_download_url(shared_link):
+    """Test that a shared link becomes a download from the content host."""
+    assert download_url(shared_link) == (
+        "https://dl.dropboxusercontent.com/scl/fi/abc123/ep.mp3?rlkey=k3y&dl=1"
     )
 
 
@@ -202,6 +218,9 @@ def test_url_shares_a_new_file_once(stubbed):
     first = remote.url("show/a.mp3")
     assert first == "https://www.dropbox.com/scl/fi/new/podcasts/show/a.mp3?rlkey=new&raw=1"
     assert remote.url("show/a.mp3") == first
+    assert remote.url("show/a.mp3", download=True) == (
+        "https://dl.dropboxusercontent.com/scl/fi/new/podcasts/show/a.mp3?rlkey=new&dl=1"
+    )
     assert client.calls.count(("share", "/podcasts/show/a.mp3")) == 1
 
 
