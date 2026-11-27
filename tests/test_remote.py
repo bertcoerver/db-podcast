@@ -27,7 +27,6 @@ from db_podcast.remote import (
     authorization,
     content_hash,
     direct_url,
-    download_url,
 )
 
 
@@ -57,27 +56,12 @@ def test_content_hash_is_a_hash_of_block_hashes(tmp_path):
         "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y&dl=0",
         "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y&dl=1",
         "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y",
-        "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y&raw=1",
+        "https://dl.dropboxusercontent.com/scl/fi/abc123/ep.mp3?rlkey=k3y&dl=1",
     ],
 )
 def test_direct_url(shared_link):
-    """Test that a shared link becomes a link to the file, keeping its key."""
+    """Test that a shared link becomes a link to the file on the content host, keeping its key."""
     assert direct_url(shared_link) == (
-        "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y&raw=1"
-    )
-
-
-@pytest.mark.parametrize(
-    "shared_link",
-    [
-        "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y&dl=0",
-        "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y&raw=1",
-        "https://www.dropbox.com/scl/fi/abc123/ep.mp3?rlkey=k3y",
-    ],
-)
-def test_download_url(shared_link):
-    """Test that a shared link becomes a download from the content host."""
-    assert download_url(shared_link) == (
         "https://dl.dropboxusercontent.com/scl/fi/abc123/ep.mp3?rlkey=k3y&dl=1"
     )
 
@@ -207,7 +191,7 @@ def test_url_reuses_an_existing_link(stubbed):
             url="https://www.dropbox.com/scl/fi/old/feed.xml?rlkey=old&dl=0",
         )
     ]
-    expected = "https://www.dropbox.com/scl/fi/old/feed.xml?rlkey=old&raw=1"
+    expected = "https://dl.dropboxusercontent.com/scl/fi/old/feed.xml?rlkey=old&dl=1"
     assert remote.url("Show/feed.xml") == expected
     assert ("share", "/podcasts/Show/feed.xml") not in client.calls
 
@@ -216,11 +200,8 @@ def test_url_shares_a_new_file_once(stubbed):
     """Test that a link is made for a file without one, and remembered."""
     remote, client = stubbed
     first = remote.url("show/a.mp3")
-    assert first == "https://www.dropbox.com/scl/fi/new/podcasts/show/a.mp3?rlkey=new&raw=1"
+    assert first == "https://dl.dropboxusercontent.com/scl/fi/new/podcasts/show/a.mp3?rlkey=new&dl=1"
     assert remote.url("show/a.mp3") == first
-    assert remote.url("show/a.mp3", download=True) == (
-        "https://dl.dropboxusercontent.com/scl/fi/new/podcasts/show/a.mp3?rlkey=new&dl=1"
-    )
     assert client.calls.count(("share", "/podcasts/show/a.mp3")) == 1
 
 
@@ -243,7 +224,7 @@ def test_url_when_dropbox_says_the_link_exists(stubbed, in_error):
         SharedLinkAlreadyExistsMetadata.metadata(existing) if in_error else None
     )
     client.shared = [existing]
-    assert remote.url("show/a.mp3") == "https://www.dropbox.com/scl/fi/old/a.mp3?rlkey=old&raw=1"
+    assert remote.url("show/a.mp3") == "https://dl.dropboxusercontent.com/scl/fi/old/a.mp3?rlkey=old&dl=1"
     assert ("share", "/podcasts/show/a.mp3") in client.calls
 
 

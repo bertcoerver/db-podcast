@@ -33,13 +33,13 @@ class FakeRemote:
                 del self.files[existing]
                 self.links.pop(existing.lower(), None)
 
-    def url(self, name, download=False):
+    def url(self, name):
         key = name.lower()
         assert key in {existing.lower() for existing in self.files}, (
             f"{name} was shared before it was uploaded"
         )
-        self.links.setdefault(key, f"https://dropbox.test/{len(self.links)}/{key}?raw=1")
-        return self.links[key].replace("raw=1", "dl=1") if download else self.links[key]
+        self.links.setdefault(key, f"https://dropbox.test/{len(self.links)}/{key}?dl=1")
+        return self.links[key]
 
 
 @pytest.fixture
@@ -78,12 +78,9 @@ def test_sync_uploads_files_and_feed(library):
     # Newest first.
     assert [item.findtext("title") for item in items] == ["second", "The first"]
     assert [item.find("enclosure").get("url") for item in items] == [
-        remote.url("show/second.mp3", download=True),
-        remote.url("show/first.mp3", download=True),
+        remote.links["show/second.mp3"],
+        remote.links["show/first.mp3"],
     ]
-    # Episodes are linked to as downloads; the feed and the artwork are not.
-    assert all(item.find("enclosure").get("url").endswith("dl=1") for item in items)
-    assert published.feed_url.endswith("raw=1")
     itunes_episode = "{http://www.itunes.com/dtds/podcast-1.0.dtd}episode"
     assert [item.findtext(itunes_episode) for item in items] == [None, "7"]
     assert [item.findtext("pubDate") for item in items] == [

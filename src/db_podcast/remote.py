@@ -5,19 +5,17 @@ file, with a key in it that cannot be derived from the file's name::
 
     https://www.dropbox.com/scl/fi/<id>/episode.mp3?rlkey=<key>&dl=0
 
-Opened as is, that is a preview page. With ``raw=1`` in place of ``dl=0`` it
-is the file itself, which is what the feed and its artwork are published as.
-The link belongs to the file, not to its content: uploading a new version over
-it keeps the URL, so a feed's URL stays the same for as long as the feed is
-not deleted.
-
-An episode is linked to differently, as a download from Dropbox's content
-host::
+Opened as is, that is a preview page. The file itself is what Dropbox's
+content host answers with, and that is the URL that gets published::
 
     https://dl.dropboxusercontent.com/scl/fi/<id>/episode.mp3?rlkey=<key>&dl=1
 
-The ``raw=1`` link gets there too, but by way of a redirect that a Yoto player
-does not play from.
+The shared link with ``raw=1`` in place of ``dl=0`` gets there too, but by way
+of a redirect, and a Yoto player does not play an episode it is redirected to.
+
+The link belongs to the file, not to its content: uploading a new version over
+it keeps the URL, so a feed's URL stays the same for as long as the feed is
+not deleted.
 """
 
 import hashlib
@@ -108,19 +106,15 @@ class DropboxRemote:
         """Delete the file or folder ``name``."""
         self._dropbox.files_delete_v2(self._path(name))
 
-    def url(self, name: str, download: bool = False) -> str:
-        """Return the public URL of the file ``name``, sharing it if need be.
-
-        With ``download``, it is the URL to download the file from rather than
-        the one to open it at, which is the one to use for an episode.
-        """
+    def url(self, name: str) -> str:
+        """Return the public URL of the file ``name``, sharing it if need be."""
         path = self._path(name)
         if self._links is None:
             self._links = self._shared_links()
         key = path.lower()
         if key not in self._links:
             self._links[key] = self._share(path)
-        return (download_url if download else direct_url)(self._links[key])
+        return direct_url(self._links[key])
 
     def _path(self, name: str) -> str:
         return f"{self._root}/{name}"
@@ -164,15 +158,7 @@ def authorization(app_key: str) -> DropboxOAuth2FlowNoRedirect:
 
 
 def direct_url(shared_link: str) -> str:
-    """Turn a shared link into the URL of the file itself."""
-    parts = urlsplit(shared_link)
-    query = [(key, value) for key, value in parse_qsl(parts.query) if key not in ("dl", "raw")]
-    query.append(("raw", "1"))
-    return urlunsplit(parts._replace(query=urlencode(query)))
-
-
-def download_url(shared_link: str) -> str:
-    """Turn a shared link into the URL to download the file from, without a redirect."""
+    """Turn a shared link into the URL of the file itself, without a redirect."""
     parts = urlsplit(shared_link)
     query = [(key, value) for key, value in parse_qsl(parts.query) if key not in ("dl", "raw")]
     query.append(("dl", "1"))
